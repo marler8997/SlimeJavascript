@@ -1,0 +1,247 @@
+<html><head>
+<script type="text/javascript" src="Slime.js"></script>
+<script type="text/javascript" src="Input.js"></script>
+<script type="text/javascript">
+
+  // RENDER DATA
+  var ctx;
+  var canvas;
+  var gameWidth,gameHeight;
+  var pixelsPerUnit;
+  var updatesToPaint;
+
+
+  // GAME DATA
+  var ball;
+  var slime1;
+  var slime2;
+  var slime1Score;
+  var slime2Score;  
+  
+  // Game Update Functions
+  function updateSlimeVelocities(s,left,right,up) {
+    // update velocities
+    if(keysDown[left]) {
+      if(keysDown[right]) {
+        s.velocityX = 0;
+      } else {
+        s.velocityX = -8;
+      }
+    } else if(keysDown[right]) {
+      s.velocityX = 8;
+    } else {
+      s.velocityX = 0;
+    }
+    if(s.y == 0 && keysDown[up]) {
+      //s.velocityY = 31;
+      s.velocityY = 18;
+    }
+  }
+  function updateSlime(s, leftLimit, rightLimit) {
+    if(s.velocityX != 0) {
+      s.x += s.velocityX;
+      if(s.x - s.radius < leftLimit) {
+        s.x = leftLimit + s.radius;
+      } else if(s.x + s.radius > rightLimit) {
+        s.x = rightLimit - s.radius;
+      }
+    }
+    if(s.velocityY != 0 || s.y > 0) {
+      s.y += s.velocityY;
+      s.velocityY -= 1.2;
+      if(s.y < 0) {
+        s.y = 0;
+        s.velocityY = 0;
+      }
+    }
+  }
+
+  var MAX_VELOCITY_X = 15;
+  var MAX_VELOCITY_Y = 11;
+  function collisionBallSlime(s) {
+    var dx = ball.x - s.x;
+    var dy = ball.y - s.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    //console.log("dist = " + dist);
+
+    var dVelocityX = ball.velocityX - s.velocityX;
+    var dVelocityY = ball.velocityY - s.velocityY;
+
+    if(dy > 0 && dist < ball.radius + s.radius) {
+      var oldBall = {x:ball.x,y:ball.y,velocityX:ball.velocityX,velocityY:ball.velocityY};
+
+      ball.x = s.x + (s.radius + ball.radius) * dx / dist;
+      ball.y = s.y + (s.radius + ball.radius) * dy / dist;
+      
+      var something = (dx * dVelocityX + dy * dVelocityY) / dist;
+      if(something <= 0) {
+        ball.velocityX += s.velocityX - 1.92 * dx * something / dist;
+        ball.velocityY += s.velocityY - 1.92 * dy * something / dist;
+        if(     ball.velocityX < -MAX_VELOCITY_X) ball.velocityX = -MAX_VELOCITY_X;
+        else if(ball.velocityX >  MAX_VELOCITY_X) ball.velocityX =  MAX_VELOCITY_X;
+        if(     ball.velocityY < -MAX_VELOCITY_Y) ball.velocityY = -MAX_VELOCITY_Y;
+        else if(ball.velocityY >  MAX_VELOCITY_Y) ball.velocityY =  MAX_VELOCITY_Y;
+      }
+      /*
+      console.log("Collision something: " + something +
+                  ", dy: " + dy +
+                  ", dist: " + dist + ", y:" + oldBall.y + ">" + ball.y +
+                  ", velocityY: " + oldBall.velocityY + ">" + ball.velocityY);*/
+    }    
+  }
+  function updateBall() {
+    ball.x += ball.velocityX;
+    ball.y += ball.velocityY;
+
+    ball.velocityY += -.5; // gravity
+    if(ball.velocityY < -MAX_VELOCITY_Y) {
+      ball.velocityY = -MAX_VELOCITY_Y;
+    }
+    
+    collisionBallSlime(slime1);
+    collisionBallSlime(slime2);
+
+    // detect wall collisions
+    if(ball.x - ball.radius < 0) {
+      ball.x = ball.radius;
+      ball.velocityX = -ball.velocityX;
+    }
+    else if(ball.x + ball.radius > 1000) {
+      ball.x = 1000 - ball.radius;
+      ball.velocityX = -ball.velocityX;
+    }
+
+
+    if(ball.y < 0) {
+      if(ball.x > 500) {
+        slime1Score++;
+        initRound(true);
+      } else {
+        slime2Score++;
+        initRound(false);
+      }
+    }
+  }
+  function updateFrame() {
+    updateSlimeVelocities(slime1, KEY_A,KEY_D,KEY_W);
+    updateSlimeVelocities(slime2, KEY_LEFT,KEY_RIGHT,KEY_UP);
+
+    updateSlime(slime1, 0, 495);
+    updateSlime(slime2, 505, 1000);
+
+    updateBall();
+  }
+
+
+  // Rendering Functions
+  function renderBackground()
+  {
+    var courtHeight = gameHeight/5;
+    ctx.fillStyle='#0077ff'
+    ctx.fillRect(0, 0, gameWidth, gameHeight-courtHeight);
+    ctx.fillStyle='#ca6'
+    ctx.fillRect(0, gameHeight-courtHeight, gameWidth, courtHeight);
+    ctx.fillStyle='#fff'
+    ctx.fillRect(gameWidth/2-2,7*gameHeight/10,4,gameHeight/10+5);
+  }
+
+  
+  // GAME CODE
+  function renderGame() {
+    if(updatesToPaint == 0) {
+      console.log("WARNING: render called but not ready to paint");
+    } else {
+      if(updatesToPaint > 1) {
+        console.log("WARNING: render missed " + (updatesToPaint - 1) + " frame(s)");
+      }
+      renderBackground();
+      ctx.font = "20px Georgia";
+      ctx.fillText("Score: " + slime1Score, 0, 20);
+      ctx.fillText("Score: " + slime2Score, gameWidth - 200, 20);
+      ball.render();
+      slime1.render();
+      slime2.render();
+      updatesToPaint = 0;
+    }
+  }
+  function gameIteration() {
+    if(updatesToPaint > 0) {
+      console.log("WARNING: updating frame before it was rendered");
+    }
+    updateFrame();
+    updatesToPaint++;
+    requestAnimationFrame(renderGame);
+  }
+
+  function initRound(server) {
+    ball.x = server ? 200 : 800;
+    ball.y = 200;
+    ball.velocityX = 0;
+    ball.velocityY = 0;
+
+    slime1.x = 200;
+    slime1.y = 0;
+    slime1.velocityX = 0;
+    slime1.velocityY = 0;
+
+    slime2.x = 800;
+    slime2.y = 0;
+    slime2.velocityX = 0;
+    slime2.velocityY = 0;
+  }
+
+  function updateWindowSize(width,height) {
+    gameWidth = width;
+    gameHeight = height;
+
+    console.log("WindowSize " + width + ", " + height);
+
+    var pixelsPerUnitX = gameWidth  / 1000;
+    var pixelsPerUnitY = gameHeight / 500;
+    console.log("xRatio " + pixelsPerUnitX + ", yRatio " + pixelsPerUnitY);
+
+    if(pixelsPerUnitX == pixelsPerUnitY) {
+      pixelsPerUnit = pixelsPerUnitX;
+      console.log("pixelsPerUnit = " + pixelsPerUnit + " (no adjust)");
+    } else if(pixelsPerUnitX < pixelsPerUnitY) {
+      pixelsPerUnit = pixelsPerUnitX;
+      gameHeight = gameWidth / 2;
+      console.log("pixelsPerUnit = " + pixelsPerUnit + " (adjust to X, newHeight=" + gameHeight + ")");
+    } else {
+      pixelsPerUnit = pixelsPerUnitX;
+      gameWidth = gameHeight * 2;
+      console.log("pixelsPerUnit = " + pixelsPerUnit + " (adjust to Y)");
+    }
+  }
+
+  function bodyload() {
+    // Create Render objects
+    var canvas = document.createElement("canvas");
+    ctx = canvas.getContext("2d");
+    canvas.width = 730;
+    //canvas.height = 375; original
+    canvas.height = 365;
+    //canvas.height = 730;
+
+    // Setup Render Data
+    updateWindowSize(canvas.width,canvas.height);
+    document.body.appendChild(canvas);
+
+    // Initialize Game Data
+    ball   = newBall( 15 ,'#ff0');
+    slime1 = newSlime(50,'#f00');
+    slime2 = newSlime(50,'#0f0');
+
+    slime1Score = 0;
+    slime2Score = 0;
+
+    initRound(true);
+
+    setInterval(gameIteration, 20);
+  }  
+
+
+      
+</script>
+</head><body onload="bodyload()">
+</body></html>
