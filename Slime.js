@@ -14,11 +14,11 @@ function newBall(radius,color) {
     velocityY:0,
     render: function() {
       var xPix   = this.x * pixelsPerUnit;
-      var yPix   = (4 * gameHeight / 5) - (this.y * pixelsPerUnit);
+      var yPix   = courtY - (this.y * pixelsPerUnit);
 
-      //yPix /= 2;
-
-      var radiusPix = this.radius * pixelsPerUnit;
+      // The original game's ball looked bigger then
+      // it was, so we add 2 pixels here to the radius
+      var radiusPix = this.radius * pixelsPerUnit + 2;
       ctx.fillStyle = this.color;
       ctx.beginPath();
       ctx.arc(xPix, yPix, radiusPix, 0, 2*Math.PI);
@@ -36,9 +36,7 @@ function newSlime(radius,color) {
     velocityY:0,
       render: function() {
       var xPix      = this.x * pixelsPerUnit;
-      var yPix      = (4 * gameHeight / 5) - (this.y * pixelsPerUnit);
-
-      //yPix /= 2;
+      var yPix      = courtY - (this.y * pixelsPerUnit);
 
       var radiusPix = this.radius * pixelsPerUnit;
       ctx.fillStyle = this.color;

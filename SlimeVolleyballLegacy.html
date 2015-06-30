@@ -1,12 +1,13 @@
 <html><head>
 <script type="text/javascript" src="Input.js"></script>
+<script type="text/javascript" src="SlimeAI.js"></script>
 <script type="text/javascript">
 
-var physicsLog = 0;
+var physicsLog = 120;
 
 // Objects rendered in the slime engine
 // need an x and a y parameter
-function newBall(radius,color) {
+function newLegacyBall(radius,color) {
   return {
     radius:radius,
     color:color,
@@ -16,11 +17,11 @@ function newBall(radius,color) {
     velocityY:0,
     render: function() {
       var xPix   = this.x * pixelsPerUnitX;
-      var yPix   = (4 * gameHeight / 5) - (this.y * pixelsPerUnitY);
+      var yPix   = courtYPix - (this.y * pixelsPerUnitY);
 
-      //yPix /= 2;
-
-      var radiusPix = this.radius * pixelsPerUnitY;
+      // The original game's ball looked bigger then
+      // it was, so we add 2 pixels here to the radius
+      var radiusPix = this.radius * pixelsPerUnitY + 2;
       ctx.fillStyle = this.color;
       ctx.beginPath();
       ctx.arc(xPix, yPix, radiusPix, 0, 2*Math.PI);
@@ -28,7 +29,7 @@ function newBall(radius,color) {
     }
     };
 }
-function newSlime(radius,color) {
+function newLegacySlime(radius,color) {
   return {
     radius:radius,
     color:color,
@@ -36,11 +37,9 @@ function newSlime(radius,color) {
     y:0,
     velocityX:0,
     velocityY:0,
-      render: function() {
+    render: function() {
       var xPix      = this.x * pixelsPerUnitX;
-      var yPix      = (4 * gameHeight / 5) - (this.y * pixelsPerUnitY);
-
-      //yPix /= 2;
+      var yPix      = courtYPix - (this.y * pixelsPerUnitY);
 
       var radiusPix = this.radius * pixelsPerUnitY;
       ctx.fillStyle = this.color;
@@ -54,19 +53,29 @@ function newSlime(radius,color) {
   // RENDER DATA
   var ctx;
   var canvas;
-  var gameWidth,gameHeight;
+  var viewWidth;
+  var viewHeight;
+  var courtYPix;
   var pixelsPerUnitX;
   var pixelsPerUnitY;
   var updatesToPaint;
 
 
   // GAME DATA
+  var gameWidth,gameHeight;
   var ball;
-  var slime1;
-  var slime2;
-  var slime1Score;
-  var slime2Score;  
+  var slimeLeft;
+  var slimeRight;
+  var slimeLeftScore;
+  var slimeRightScore;
+  var slimeAI;
   
+  var logString;
+  function log(msg)
+  {
+    logString += msg + '\n';
+  }
+
   // Game Update Functions
   function updateSlimeVelocities(s,left,right,up) {
     // update velocities
@@ -101,18 +110,12 @@ function newSlime(radius,color) {
     }
   }
 
-  var logString;
-  function log(msg)
-  {
-    logString += msg + '\n';
-  }
   var MAX_VELOCITY_X = 15;
   var MAX_VELOCITY_Y = 22;
   function collisionBallSlime(s) {
     var dx = 2 * (ball.x - s.x);
     var dy = ball.y - s.y;
     var dist = Math.trunc(Math.sqrt(dx * dx + dy * dy));
-    //console.log("dist = " + dist);
 
     var dVelocityX = ball.velocityX - s.velocityX;
     var dVelocityY = ball.velocityY - s.velocityY;
@@ -157,11 +160,6 @@ function newSlime(radius,color) {
           log(" ballVY    " + ball.velocityY);
         }
       }
-      /*
-      console.log("Collision something: " + something +
-                  ", dy: " + dy +
-                  ", dist: " + dist + ", y:" + oldBall.y + ">" + ball.y +
-                  ", velocityY: " + oldBall.velocityY + ">" + ball.velocityY);*/
     }    
   }
   var FUDGE = 5; // not sure why this is needed
@@ -174,8 +172,8 @@ function newSlime(radius,color) {
     ball.x += ball.velocityX;
     ball.y += ball.velocityY;
     
-    collisionBallSlime(slime1);
-    collisionBallSlime(slime2);
+    collisionBallSlime(slimeLeft);
+    collisionBallSlime(slimeRight);
 
     // handle wall hits
     if (ball.x < 15) {
@@ -202,24 +200,26 @@ function newSlime(radius,color) {
 
     if(ball.y < 0) {
       if(ball.x > 500) {
-        slime1Score++;
+        slimeLeftScore++;
         initRound(true);
       } else {
-        slime2Score++;
+        slimeRightScore++;
         initRound(false);
       }
     }
   }
   function updateFrame() {
-    updateSlimeVelocities(slime1, KEY_A,KEY_D,KEY_W);
-    updateSlimeVelocities(slime2, KEY_LEFT,KEY_RIGHT,KEY_UP);
+    slimeAI.move(false); // Move the right slime
 
-    updateSlime(slime1, 50 , 445);
-    updateSlime(slime2, 555, 950);
+    updateSlimeVelocities(slimeLeft, KEY_A,KEY_D,KEY_W);
+    updateSlimeVelocities(slimeRight, KEY_LEFT,KEY_RIGHT,KEY_UP);
+
+    updateSlime(slimeLeft, 50 , 445);
+    updateSlime(slimeRight, 555, 950);
 
     // Allows slimes to go accross the net
-    //updateSlime(slime1, 0, 1000);
-    //updateSlime(slime2, 0, 1000);
+    //updateSlime(slimeLeft, 0, 1000);
+    //updateSlime(slimeRight, 0, 1000);
 
     updateBall();
   }
@@ -228,31 +228,30 @@ function newSlime(radius,color) {
   // Rendering Functions
   function renderBackground()
   {
-    var courtHeight = gameHeight/5;
     ctx.fillStyle='#0077ff'
-    ctx.fillRect(0, 0, gameWidth, gameHeight-courtHeight);
+    ctx.fillRect(0, 0, viewWidth, courtYPix);
     ctx.fillStyle='#ca6'
-    ctx.fillRect(0, gameHeight-courtHeight, gameWidth, courtHeight);
+    ctx.fillRect(0, courtYPix, viewWidth, viewHeight - courtYPix);
     ctx.fillStyle='#fff'
-    ctx.fillRect(gameWidth/2-2,7*gameHeight/10,4,gameHeight/10+5);
+    ctx.fillRect(viewWidth/2-2,7*viewHeight/10,4,viewHeight/10+5);
   }
 
   
   // GAME CODE
   function renderGame() {
     if(updatesToPaint == 0) {
-      console.log("WARNING: render called but not ready to paint");
+      console.log("ERROR: render called but not ready to paint");
     } else {
       if(updatesToPaint > 1) {
         console.log("WARNING: render missed " + (updatesToPaint - 1) + " frame(s)");
       }
       renderBackground();
       ctx.font = "20px Georgia";
-      ctx.fillText("Score: " + slime1Score, 0, 20);
-      ctx.fillText("Score: " + slime2Score, gameWidth - 200, 20);
+      ctx.fillText("Score: " + slimeLeftScore, 100, 20);
+      ctx.fillText("Score: " + slimeRightScore, viewWidth - 200, 20);
       ball.render();
-      slime1.render();
-      slime2.render();
+      slimeLeft.render();
+      slimeRight.render();
       updatesToPaint = 0;
     }
   }
@@ -276,7 +275,9 @@ function newSlime(radius,color) {
     }
     updateFrame();
     updatesToPaint++;
-    requestAnimationFrame(renderGame);
+    if(updatesToPaint == 1) {
+      requestAnimationFrame(renderGame);
+    }
   }
 
   function initRound(server) {
@@ -285,31 +286,37 @@ function newSlime(radius,color) {
     ball.velocityX = 0;
     ball.velocityY = 0;
 
-    slime1.x = 200;
-    slime1.y = 0;
-    slime1.velocityX = 0;
-    slime1.velocityY = 0;
+    slimeLeft.x = 200;
+    slimeLeft.y = 0;
+    slimeLeft.velocityX = 0;
+    slimeLeft.velocityY = 0;
 
-    slime2.x = 800;
-    slime2.y = 0;
-    slime2.velocityX = 0;
-    slime2.velocityY = 0;
+    slimeRight.x = 800;
+    slimeRight.y = 0;
+    slimeRight.velocityX = 0;
+    slimeRight.velocityY = 0;
   }
 
   function updateWindowSize(width,height) {
-    gameWidth = width;
-    gameHeight = height;
-    console.log("WindowSize " + width + ", " + height);
-    pixelsPerUnitX = gameWidth  / 1000;
-    pixelsPerUnitY = gameHeight / 1000;
+    viewWidth = width;
+    viewHeight = height;
+    console.log("ViewSize x: " + width + ", y: " + height);
+    pixelsPerUnitX = width / gameWidth;
+    pixelsPerUnitY = height / gameHeight;
+    console.log("GAMESIZE x: " + gameWidth + ", y: " + gameHeight);
+    console.log("PPU      x: " + pixelsPerUnitX + ", y: " + pixelsPerUnitY);
+    courtYPix = 4 * viewHeight / 5;
   }
 
   function bodyload() {
     // Create Render objects
     var canvas = document.createElement("canvas");
     ctx = canvas.getContext("2d");
-    canvas.width = 730;
+    canvas.width = 750;
     canvas.height = 375;
+
+    gameWidth  = 1000;
+    gameHeight = 1000;
 
     // Setup Render Data
     updateWindowSize(canvas.width,canvas.height);
@@ -317,19 +324,21 @@ function newSlime(radius,color) {
 
     // Initialize Logging
     logString = '';
-    //logDom = document.createElement('p');
-    //document.body.appendChild(logDom);
 
     // Initialize Game Data
-    ball   = newBall(  25,'#ff0');
-    slime1 = newSlime(100,'#f00');
-    slime2 = newSlime(100,'#0f0');
+    ball   = newLegacyBall(  25,'#ff0');
+    slimeLeft = newLegacySlime(100,'#f00');
+    slimeRight = newLegacySlime(100,'#0f0');
 
-    slime1Score = 0;
-    slime2Score = 0;
+    slimeLeftScore = 0;
+    slimeRightScore = 0;
+
+    slimeAI = newSlimeAI(false);
+    setPatheticWhiteSlime(slimeAI);
 
     initRound(true);
 
+    updatesToPaint = 0;
     setInterval(gameIteration, 20);
   }  
 
