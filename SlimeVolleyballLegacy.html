@@ -125,9 +125,17 @@ function newLegacySlime(onLeft,radius,color) {
   };
 }
 
+var GAME_STATE_RUNNING     = 1;
+var GAME_STATE_PAUSED      = 2;
+var GAME_STATE_SHOW_WINNER = 3;
+
   // MENU DATA
   var menuDiv;
+  var onePlayer;
+  var nextSlimeIndex;
 
+  var gameState;
+  
   // RENDER DATA
   var ctx;
   var canvas;
@@ -140,6 +148,10 @@ function newLegacySlime(onLeft,radius,color) {
   var skyImage;
   var beachImage;
   var ballImage;
+  var gameIntervalObject;
+  var endOfPointText;
+  var greenSlimeImage;
+  var redSlimeImage;
 
 
   // GAME DATA
@@ -244,6 +256,7 @@ function newLegacySlime(onLeft,radius,color) {
     }    
   }
   var FUDGE = 5; // not sure why this is needed
+  // returns true if end of point
   function updateBall() {
     ball.velocityY += -1; // gravity
     if(ball.velocityY < -MAX_VELOCITY_Y) {
@@ -279,15 +292,18 @@ function newLegacySlime(onLeft,radius,color) {
       }
     }
 
+    // Check for end of point
     if(ball.y < 0) {
       if(ball.x > 500) {
         slimeLeftScore++;
-        initRound(true);
+        endPoint(true)
       } else {
         slimeRightScore++;
-        initRound(false);
+        endPoint(false)
       }
+      return true;
     }
+    return false;
   }
   function updateFrame() {
     if(slimeAI) {
@@ -304,7 +320,10 @@ function newLegacySlime(onLeft,radius,color) {
     //updateSlime(slimeLeft, 0, 1000);
     //updateSlime(slimeRight, 0, 1000);
 
-    updateBall();
+    if(updateBall()) {
+      return;
+    }
+    
   }
 
 
@@ -347,31 +366,120 @@ function newLegacySlime(onLeft,radius,color) {
       updatesToPaint = 0;
     }
   }
+  function renderEndOfPoint() {
+    var textWidth = ctx.measureText(endOfPointText).width;
+    renderGame();
+    ctx.fillStyle = '#000';
+    ctx.fillText(endOfPointText,
+      (viewWidth - textWidth)/2, courtYPix + (viewHeight - courtYPix)/2);
+  }
 
   function gameIteration() {
-    if(updatesToPaint > 0) {
-      console.log("WARNING: updating frame before it was rendered");
-    }
-    if(physicsLog > 0) {
-      log("Frame");
-      log(" ball.x  " + ball.x);
-      log(" ball.y  " + ball.y);
-      log(" ball.vx " + ball.velocityX);
-      log(" ball.vy " + ball.velocityY);
-      physicsLog--;
-      if(physicsLog == 0) {
-        var logDom = document.createElement('pre');
-        logDom.innerHTML = logString;
-        document.body.appendChild(logDom);
+    if(gameState == GAME_STATE_RUNNING) {
+      if(updatesToPaint > 0) {
+        console.log("WARNING: updating frame before it was rendered");
       }
-    }
-    updateFrame();
-    updatesToPaint++;
-    if(updatesToPaint == 1) {
-      requestAnimationFrame(renderGame);
+      if(physicsLog > 0) {
+        log("Frame");
+        log(" ball.x  " + ball.x);
+        log(" ball.y  " + ball.y);
+        log(" ball.vx " + ball.velocityX);
+        log(" ball.vy " + ball.velocityY);
+        physicsLog--;
+        if(physicsLog == 0) {
+          var logDom = document.createElement('pre');
+          logDom.innerHTML = logString;
+          document.body.appendChild(logDom);
+        }
+      }
+      updateFrame();
+      updatesToPaint++;
+      if(updatesToPaint == 1) {
+        requestAnimationFrame(renderGame);
+      }
     }
   }
 
+
+
+
+  function spaceKeyDown() {
+    if(gameState == GAME_STATE_SHOW_WINNER) {
+      if(onePlayer && nextSlimeIndex >= slimeAIs.length) {
+        nextSlimeIndex = 0;
+        toInitialMenu();        
+      } else {
+        start(onePlayer);
+      }
+    }
+  }
+  function endMatch(leftWins) {
+    gameState = GAME_STATE_SHOW_WINNER;
+    clearInterval(gameIntervalObject);
+    if(onePlayer) {
+      if(leftWins) {
+	nextSlimeIndex++;
+	if(nextSlimeIndex >= slimeAIs.length) {
+          menuDiv.innerHTML = '<div style="text-align:center;">' +
+            '<h1 style="margin:50px 0 20px 0;">You beat everyone!</h1>' +
+            "Press 'space' to claim your victory..." +
+            '</div>';
+	} else {
+          menuDiv.innerHTML = '<div style="text-align:center;">' +
+            '<h1 style="margin:50px 0 20px 0;">You won!</h1>' +
+            "Press 'space' to continue..." +
+            '</div>';
+	}
+      } else {
+	nextSlimeIndex = 0;
+        menuDiv.innerHTML = '<div style="text-align:center;">' +
+          '<h1 style="margin:50px 0 20px 0;">You lost :(</h1>' +
+          "Press 'space' to retry..." +
+          '</div>';
+      }
+    } else {
+      menuDiv.innerHTML = '<div style="text-align:center;">' +
+        '<h1 style="margin:50px 0 20px 0;">Player ' + (leftWins ? '1' : '2') + ' Wins!</h1>' +
+        "Press 'space' for rematch..." +
+        '</div>';
+    }
+    menuDiv.style.display = 'block';
+    canvas.style.display = 'none';
+  }
+  function endPoint(leftWins) {
+    if(slimeAI) {
+      keysDown[KEY_UP] = false;
+      keysDown[KEY_RIGHT] = false;
+      keysDown[KEY_LEFT] = false;
+    }
+
+    if(slimeLeftScore >= 5) {
+      endMatch(true);
+      return;
+    }
+    if(slimeRightScore >= 5) {
+      endMatch(false);
+      return;
+    }
+
+    if(onePlayer) {
+      if(leftWins) {
+        endOfPointText = 'Nice, you got the point!';
+      } else {
+        endOfPointText = slimeAI.name + ' scores!';
+      }
+    } else {
+      endOfPointText = 'Player ' + (leftWins ? '1':'2') + ' scores!';
+    }
+    gameState = GAME_STATE_PAUSED;
+    requestAnimationFrame(renderEndOfPoint);
+    
+    setTimeout(function initNextPoint() {
+      initRound(leftWins);
+      updatesToPaint = 0;
+      gameState = GAME_STATE_RUNNING;
+    }, 700);
+  }
   function initRound(server) {
     ball.x = server ? 200 : 800;
     ball.y = 356;
@@ -424,6 +532,7 @@ function newLegacySlime(onLeft,radius,color) {
     canvas.style.display  = 'none';
     
     ctx = canvas.getContext("2d");
+    ctx.font = "20px Georgia";
 
     gameWidth  = 1000;
     gameHeight = 1000;
@@ -436,6 +545,7 @@ function newLegacySlime(onLeft,radius,color) {
     logString = '';
 
     // Initialize Game Data
+    nextSlimeIndex = 0;
     ball       = newLegacyBall(  25,'#fff');
     slimeLeft  = newLegacySlime(true,100,'#f00');
     slimeRight = newLegacySlime(false,100,'#0f0');
@@ -459,53 +569,57 @@ function newLegacySlime(onLeft,radius,color) {
       ballImage = this;
     }
 
-    var slimeLeftImage = new Image();
-    slimeLeftImage.src = 'slime175green.png';
-    slimeLeftImage.onload = function() {
+    greenSlimeImage = new Image();
+    greenSlimeImage.src = 'slime175green.png';
+    /*
+    greenSlimeImage.onload = function() {
       slimeLeft.img = this;
     }
-    var slimeRightImage = new Image();
-    slimeRightImage.src = 'slime175red.png';
-    slimeRightImage.onload = function() {
+    */
+    redSlimeImage = new Image();
+    redSlimeImage.src = 'slime175red.png';
+    /*
+    redSlimeImage.onload = function() {
       slimeRight.img = this;
     }
+    */
 
     toInitialMenu();
   }
 
   // Menu Functions
-  function startOnePlayer() {
+  function start(startAsOnePlayer) {
+    onePlayer = startAsOnePlayer;
+
     slimeLeftScore = 0;
     slimeRightScore = 0;
 
-    slimeAI = newSlimeAI(false);
-    setPatheticWhiteSlime(slimeAI);
+    slimeLeft.img = greenSlimeImage;
+    if(onePlayer) {
+      var slimeAIProps = slimeAIs[nextSlimeIndex];
+      slimeRight.color = slimeAIProps.color;
+      slimeRight.img = null;
+      slimeAI = newSlimeAI(false,slimeAIProps.name);
+      slimeAIProps.initAI(slimeAI);
+    } else {
+      slimeRight.img = redSlimeImage;
+      slimeAI = null;
+    }
 
     initRound(true);
 
     updatesToPaint = 0;
-    setInterval(gameIteration, 20);
+    gameState = GAME_STATE_RUNNING
+    renderBackground(); // clear the field
     canvas.style.display = 'block';
     menuDiv.style.display = 'none';
-  }
-  function startTwoPlayer() {
-    slimeLeftScore = 0;
-    slimeRightScore = 0;
-
-    slimeAI = null;
-
-    initRound(true);
-
-    updatesToPaint = 0;
-    setInterval(gameIteration, 20);
-    canvas.style.display = 'block';
-    menuDiv.style.display = 'none';
+    gameIntervalObject = setInterval(gameIteration, 20);
   }
   function toInitialMenu() {
     menuDiv.innerHTML = '<div style="text-align:center;">' +
       '<h1 style="margin-top:30px;">Slime Volleyball</h1>' +
-      '<span onclick="startOnePlayer()" class="btn" style="display:inline-block;margin:20px 30px 20px 30px;">One Player</span>' +
-      '<span onclick="startTwoPlayer()" class="btn" style="display:inline-block;margin:20px 30px 20px 30px;">Two Player</span>' +
+      '<span onclick="start(true)" class="btn" style="display:inline-block;margin:20px 30px 20px 30px;">One Player</span>' +
+      '<span onclick="start(false)" class="btn" style="display:inline-block;margin:20px 30px 20px 30px;">Two Player</span>' +
       '<p>Originally written by Quin Pendragon and Daniel Wedge (http://oneslime.net)<br/>' +
       'Rewritten by Jonathan Marler</p>'
       '</div>';
