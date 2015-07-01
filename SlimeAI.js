@@ -86,7 +86,6 @@ function newSlimeAI(onLeft) {
     }
   };
 }
-
 function setPatheticWhiteSlime(ai) {
   ai.state = -1;
 

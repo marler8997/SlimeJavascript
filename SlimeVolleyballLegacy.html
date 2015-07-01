@@ -1,4 +1,39 @@
 <html><head>
+<style type="text/css">
+/* MENU CSS */
+* {margin:0;padding:0;font-family: Arial;}
+h1 {font-size:70;}
+.btn {
+  background: #3498db;
+  background-image: -webkit-linear-gradient(top, #3498db, #2980b9);
+  background-image: -moz-linear-gradient(top, #3498db, #2980b9);
+  background-image: -ms-linear-gradient(top, #3498db, #2980b9);
+  background-image: -o-linear-gradient(top, #3498db, #2980b9);
+  background-image: linear-gradient(to bottom, #3498db, #2980b9);
+  -webkit-border-radius: 15;
+  -moz-border-radius: 15;
+  border-radius: 15px;
+  color: #ffffff;
+  font-size: 45px;
+  padding: 10px 20px 10px 20px;
+  border: solid #1f628d 5px;
+  text-decoration: none;
+  cursor:pointer;
+  user-select: none;
+  -o-user-select:none;
+  -moz-user-select: none;
+  -khtml-user-select: none;
+  -webkit-user-select: none;
+}
+.btn:hover {
+  background: #3cb0fd;
+  background-image: -webkit-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: -moz-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: -ms-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: -o-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: linear-gradient(to bottom, #3cb0fd, #3498db);
+}
+</style>
 <script type="text/javascript" src="Input.js"></script>
 <script type="text/javascript" src="SlimeAI.js"></script>
 <script type="text/javascript">
@@ -89,6 +124,9 @@ function newLegacySlime(onLeft,radius,color) {
     }
   };
 }
+
+  // MENU DATA
+  var menuDiv;
 
   // RENDER DATA
   var ctx;
@@ -252,7 +290,9 @@ function newLegacySlime(onLeft,radius,color) {
     }
   }
   function updateFrame() {
-    slimeAI.move(false); // Move the right slime
+    if(slimeAI) {
+      slimeAI.move(false); // Move the right slime
+    }
 
     updateSlimeVelocities(slimeLeft, KEY_A,KEY_D,KEY_W);
     updateSlimeVelocities(slimeRight, KEY_LEFT,KEY_RIGHT,KEY_UP);
@@ -360,12 +400,30 @@ function newLegacySlime(onLeft,radius,color) {
     courtYPix = 4 * viewHeight / 5;
   }
 
+  function setupView(view) {
+    view.style.position = 'absolute';
+    view.style.left     = '10px';
+    view.style.top      = '10px';
+  }
+
   function bodyload() {
+    // Create Menu Objects
+    menuDiv = document.createElement('div');
+    setupView(menuDiv,false);
+    menuDiv.style.width  = '750px';
+    menuDiv.style.height = '375px';
+    
+    menuDiv.style.background = "#ca6 url('sky2.jpg') no-repeat";
+    document.body.appendChild(menuDiv);
+
     // Create Render objects
-    var canvas = document.createElement("canvas");
-    ctx = canvas.getContext("2d");
-    canvas.width = 750;
+    canvas = document.createElement('canvas');
+    canvas.width  = 750;
     canvas.height = 375;
+    setupView(canvas,true);
+    canvas.style.display  = 'none';
+    
+    ctx = canvas.getContext("2d");
 
     gameWidth  = 1000;
     gameHeight = 1000;
@@ -382,7 +440,6 @@ function newLegacySlime(onLeft,radius,color) {
     slimeLeft  = newLegacySlime(true,100,'#f00');
     slimeRight = newLegacySlime(false,100,'#0f0');
     
-
     var localSkyImage = new Image();
     localSkyImage.src = 'sky2.jpg';
     localSkyImage.onload = function() {
@@ -402,7 +459,6 @@ function newLegacySlime(onLeft,radius,color) {
       ballImage = this;
     }
 
-
     var slimeLeftImage = new Image();
     slimeLeftImage.src = 'slime175green.png';
     slimeLeftImage.onload = function() {
@@ -414,6 +470,11 @@ function newLegacySlime(onLeft,radius,color) {
       slimeRight.img = this;
     }
 
+    toInitialMenu();
+  }
+
+  // Menu Functions
+  function startOnePlayer() {
     slimeLeftScore = 0;
     slimeRightScore = 0;
 
@@ -424,8 +485,33 @@ function newLegacySlime(onLeft,radius,color) {
 
     updatesToPaint = 0;
     setInterval(gameIteration, 20);
-  }  
-      
+    canvas.style.display = 'block';
+    menuDiv.style.display = 'none';
+  }
+  function startTwoPlayer() {
+    slimeLeftScore = 0;
+    slimeRightScore = 0;
+
+    slimeAI = null;
+
+    initRound(true);
+
+    updatesToPaint = 0;
+    setInterval(gameIteration, 20);
+    canvas.style.display = 'block';
+    menuDiv.style.display = 'none';
+  }
+  function toInitialMenu() {
+    menuDiv.innerHTML = '<div style="text-align:center;">' +
+      '<h1 style="margin-top:30px;">Slime Volleyball</h1>' +
+      '<span onclick="startOnePlayer()" class="btn" style="display:inline-block;margin:20px 30px 20px 30px;">One Player</span>' +
+      '<span onclick="startTwoPlayer()" class="btn" style="display:inline-block;margin:20px 30px 20px 30px;">Two Player</span>' +
+      '<p>Originally written by Quin Pendragon and Daniel Wedge (http://oneslime.net)<br/>' +
+      'Rewritten by Jonathan Marler</p>'
+      '</div>';
+  }
+
+
 </script>
 </head><body onload="bodyload()">
 </body></html>
