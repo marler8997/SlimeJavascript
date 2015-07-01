@@ -65,7 +65,7 @@ function newSlimeAI(onLeft) {
       keysDown[KEY_RIGHT] = false;
     },
     jump : function() {
-      console.log('jump');
+      //console.log('jump');
       keysDown[KEY_UP] = true;
     },
     calculateXWhenBallBelow : function(yLimit) {

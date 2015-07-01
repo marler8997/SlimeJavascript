@@ -3,7 +3,8 @@
 <script type="text/javascript" src="SlimeAI.js"></script>
 <script type="text/javascript">
 
-var physicsLog = 120;
+var physicsLog = 0;
+var TWO_PI = Math.PI*2;
 
 // Objects rendered in the slime engine
 // need an x and a y parameter
@@ -15,24 +16,37 @@ function newLegacyBall(radius,color) {
     y:0,
     velocityX:0,
     velocityY:0,
+    rotation:0,
     render: function() {
       var xPix   = this.x * pixelsPerUnitX;
       var yPix   = courtYPix - (this.y * pixelsPerUnitY);
-
       // The original game's ball looked bigger then
       // it was, so we add 2 pixels here to the radius
       var radiusPix = this.radius * pixelsPerUnitY + 2;
-      ctx.fillStyle = this.color;
-      ctx.beginPath();
-      ctx.arc(xPix, yPix, radiusPix, 0, 2*Math.PI);
-      ctx.fill();
+
+      if(ballImage) {
+	this.rotation += this.velocityX / 50;
+	this.rotation = this.rotation % TWO_PI;
+
+	ctx.translate(xPix, yPix);
+        ctx.rotate(this.rotation);
+        ctx.drawImage(ballImage, -radiusPix, -radiusPix);
+	ctx.setTransform(1,0,0,1,0,0);
+      } else {
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(xPix, yPix, radiusPix, 0, TWO_PI);
+        ctx.fill();
+      }
     }
-    };
+  };
 }
-function newLegacySlime(radius,color) {
+function newLegacySlime(onLeft,radius,color) {
   return {
+    onLeft:onLeft,
     radius:radius,
     color:color,
+    img:null,
     x:0,
     y:0,
     velocityX:0,
@@ -40,14 +54,40 @@ function newLegacySlime(radius,color) {
     render: function() {
       var xPix      = this.x * pixelsPerUnitX;
       var yPix      = courtYPix - (this.y * pixelsPerUnitY);
-
       var radiusPix = this.radius * pixelsPerUnitY;
-      ctx.fillStyle = this.color;
+
+      if(this.img) {
+        ctx.drawImage(this.img, xPix - radiusPix, yPix - 38);
+      } else {
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(xPix, yPix, radiusPix, Math.PI, TWO_PI);
+        ctx.fill();
+      }
+
+      // Draw Eyes
+      var eyeX = this.x + (this.onLeft ? 1 : -1)*this.radius/4;
+      var eyeY = this.y + this.radius/2;
+      var eyeXPix = eyeX * pixelsPerUnitX;
+      var eyeYPix = courtYPix - (eyeY * pixelsPerUnitY);
+      ctx.translate(eyeXPix, eyeYPix);
+      ctx.fillStyle = '#fff';
       ctx.beginPath();
-      ctx.arc(xPix, yPix, radiusPix, Math.PI, 2*Math.PI);
+      ctx.arc(0,0, radiusPix/4, 0, TWO_PI);
       ctx.fill();
+
+      // Draw Pupil
+      var dx = ball.x - eyeX;
+      var dy = eyeY - ball.y;
+      var dist = Math.sqrt(dx*dx+dy*dy);
+      var rPixOver8 = radiusPix/8;
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.arc(rPixOver8*dx/dist, rPixOver8*dy/dist, rPixOver8, 0, TWO_PI);
+      ctx.fill();
+      ctx.setTransform(1,0,0,1,0,0);
     }
-    };
+  };
 }
 
   // RENDER DATA
@@ -59,6 +99,9 @@ function newLegacySlime(radius,color) {
   var pixelsPerUnitX;
   var pixelsPerUnitY;
   var updatesToPaint;
+  var skyImage;
+  var beachImage;
+  var ballImage;
 
 
   // GAME DATA
@@ -228,10 +271,18 @@ function newLegacySlime(radius,color) {
   // Rendering Functions
   function renderBackground()
   {
-    ctx.fillStyle='#0077ff'
-    ctx.fillRect(0, 0, viewWidth, courtYPix);
-    ctx.fillStyle='#ca6'
-    ctx.fillRect(0, courtYPix, viewWidth, viewHeight - courtYPix);
+    if(beachImage) {
+      ctx.drawImage(beachImage, 0, 0);
+    } else {
+      if(skyImage) {
+        ctx.drawImage(skyImage, 0, 0);
+      } else {
+        ctx.fillStyle='#0077ff'
+        ctx.fillRect(0, 0, viewWidth, courtYPix);
+      }
+      ctx.fillStyle='#ca6'
+      ctx.fillRect(0, courtYPix, viewWidth, viewHeight - courtYPix);
+    }
     ctx.fillStyle='#fff'
     ctx.fillRect(viewWidth/2-2,7*viewHeight/10,4,viewHeight/10+5);
   }
@@ -246,9 +297,10 @@ function newLegacySlime(radius,color) {
         console.log("WARNING: render missed " + (updatesToPaint - 1) + " frame(s)");
       }
       renderBackground();
+      ctx.fillStyle = '#000';
       ctx.font = "20px Georgia";
-      ctx.fillText("Score: " + slimeLeftScore, 100, 20);
-      ctx.fillText("Score: " + slimeRightScore, viewWidth - 200, 20);
+      ctx.fillText("Score: " + slimeLeftScore, 140, 20);
+      ctx.fillText("Score: " + slimeRightScore, viewWidth - 230, 20);
       ball.render();
       slimeLeft.render();
       slimeRight.render();
@@ -326,9 +378,41 @@ function newLegacySlime(radius,color) {
     logString = '';
 
     // Initialize Game Data
-    ball   = newLegacyBall(  25,'#ff0');
-    slimeLeft = newLegacySlime(100,'#f00');
-    slimeRight = newLegacySlime(100,'#0f0');
+    ball       = newLegacyBall(  25,'#fff');
+    slimeLeft  = newLegacySlime(true,100,'#f00');
+    slimeRight = newLegacySlime(false,100,'#0f0');
+    
+
+    var localSkyImage = new Image();
+    localSkyImage.src = 'sky2.jpg';
+    localSkyImage.onload = function() {
+      skyImage = this;
+    }
+
+    /*
+    var localBeachImage = new Image();
+    localBeachImage.src = 'beachbg.jpg';
+    localBeachImage.onload = function() {
+      beachImage = this;
+    }
+    */
+    var localBallImage = new Image();
+    localBallImage.src = 'vball.png';
+    localBallImage.onload = function() {
+      ballImage = this;
+    }
+
+
+    var slimeLeftImage = new Image();
+    slimeLeftImage.src = 'slime175green.png';
+    slimeLeftImage.onload = function() {
+      slimeLeft.img = this;
+    }
+    var slimeRightImage = new Image();
+    slimeRightImage.src = 'slime175red.png';
+    slimeRightImage.onload = function() {
+      slimeRight.img = this;
+    }
 
     slimeLeftScore = 0;
     slimeRightScore = 0;
@@ -341,8 +425,6 @@ function newLegacySlime(radius,color) {
     updatesToPaint = 0;
     setInterval(gameIteration, 20);
   }  
-
-
       
 </script>
 </head><body onload="bodyload()">
