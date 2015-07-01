@@ -3,6 +3,14 @@
 /* MENU CSS */
 * {margin:0;padding:0;font-family: Arial;}
 h1 {font-size:70;}
+.SmallButton {
+  text-decoration: none;
+  cursor:pointer;
+  color:#555;
+}
+.SmallButton:hover {
+  color:#000;
+}
 .btn {
   background: #3498db;
   background-image: -webkit-linear-gradient(top, #3498db, #2980b9);
@@ -14,7 +22,6 @@ h1 {font-size:70;}
   -moz-border-radius: 15;
   border-radius: 15px;
   color: #ffffff;
-  font-size: 45px;
   padding: 10px 20px 10px 20px;
   border: solid #1f628d 5px;
   text-decoration: none;
@@ -59,7 +66,7 @@ function newLegacyBall(radius,color) {
       // it was, so we add 2 pixels here to the radius
       var radiusPix = this.radius * pixelsPerUnitY + 2;
 
-      if(ballImage) {
+      if(ballImage && !legacyGraphics) {
 	this.rotation += this.velocityX / 50;
 	this.rotation = this.rotation % TWO_PI;
 
@@ -91,7 +98,7 @@ function newLegacySlime(onLeft,radius,color) {
       var yPix      = courtYPix - (this.y * pixelsPerUnitY);
       var radiusPix = this.radius * pixelsPerUnitY;
 
-      if(this.img) {
+      if(this.img && !legacyGraphics) {
         ctx.drawImage(this.img, xPix - radiusPix, yPix - 38);
       } else {
         ctx.fillStyle = this.color;
@@ -126,11 +133,14 @@ function newLegacySlime(onLeft,radius,color) {
 }
 
 var GAME_STATE_RUNNING     = 1;
-var GAME_STATE_PAUSED      = 2;
-var GAME_STATE_SHOW_WINNER = 3;
+var GAME_STATE_POINT_PAUSE = 2;
+var GAME_STATE_MENU_PAUSE  = 3;
+var GAME_STATE_MENU_PAUSE_BETWEEN_POINTS  = 4;
+var GAME_STATE_SHOW_WINNER = 5;
 
   // MENU DATA
   var menuDiv;
+  var smallMenuDiv;
   var onePlayer;
   var nextSlimeIndex;
 
@@ -146,12 +156,12 @@ var GAME_STATE_SHOW_WINNER = 3;
   var pixelsPerUnitY;
   var updatesToPaint;
   var skyImage;
-  var beachImage;
   var ballImage;
   var gameIntervalObject;
   var endOfPointText;
   var greenSlimeImage;
   var redSlimeImage;
+  var legacyGraphics;
 
 
   // GAME DATA
@@ -162,6 +172,12 @@ var GAME_STATE_SHOW_WINNER = 3;
   var slimeLeftScore;
   var slimeRightScore;
   var slimeAI;
+  var updateCount; // RESET every time GAME_STATE_RUNNING is set
+  var leftWon;
+  // GAME CHEAT DATA
+  // NOTE: this data should be reloaded every time the
+  //       gameState goes back to GAME_STATE_RUNNING
+  var slowMotion;
   
   var logString;
   function log(msg)
@@ -295,12 +311,13 @@ var GAME_STATE_SHOW_WINNER = 3;
     // Check for end of point
     if(ball.y < 0) {
       if(ball.x > 500) {
+        leftWon = true;
         slimeLeftScore++;
-        endPoint(true)
       } else {
+        leftWon = false;
         slimeRightScore++;
-        endPoint(false)
       }
+      endPoint()
       return true;
     }
     return false;
@@ -330,8 +347,13 @@ var GAME_STATE_SHOW_WINNER = 3;
   // Rendering Functions
   function renderBackground()
   {
-    if(beachImage) {
-      ctx.drawImage(beachImage, 0, 0);
+    if(legacyGraphics) {
+      ctx.fillStyle='#00f'
+      ctx.fillRect(0, 0, viewWidth, courtYPix);
+      ctx.fillStyle='#aaa'
+      ctx.fillRect(0, courtYPix, viewWidth, viewHeight - courtYPix);
+      ctx.fillStyle='#fff'
+      ctx.fillRect(viewWidth/2-2,7*viewHeight/10,4,viewHeight/10+5);
     } else {
       if(skyImage) {
         ctx.drawImage(skyImage, 0, 0);
@@ -341,9 +363,9 @@ var GAME_STATE_SHOW_WINNER = 3;
       }
       ctx.fillStyle='#ca6'
       ctx.fillRect(0, courtYPix, viewWidth, viewHeight - courtYPix);
+      ctx.fillStyle='#fff'
+      ctx.fillRect(viewWidth/2-2,7*viewHeight/10,4,viewHeight/10+5);
     }
-    ctx.fillStyle='#fff'
-    ctx.fillRect(viewWidth/2-2,7*viewHeight/10,4,viewHeight/10+5);
   }
 
   
@@ -374,8 +396,13 @@ var GAME_STATE_SHOW_WINNER = 3;
       (viewWidth - textWidth)/2, courtYPix + (viewHeight - courtYPix)/2);
   }
 
+
+
   function gameIteration() {
     if(gameState == GAME_STATE_RUNNING) {
+      updateCount++;
+      if(slowMotion && (updateCount % 2) == 0)
+        return;
       if(updatesToPaint > 0) {
         console.log("WARNING: updating frame before it was rendered");
       }
@@ -401,8 +428,6 @@ var GAME_STATE_SHOW_WINNER = 3;
   }
 
 
-
-
   function spaceKeyDown() {
     if(gameState == GAME_STATE_SHOW_WINNER) {
       if(onePlayer && nextSlimeIndex >= slimeAIs.length) {
@@ -413,16 +438,16 @@ var GAME_STATE_SHOW_WINNER = 3;
       }
     }
   }
-  function endMatch(leftWins) {
+  function endMatch() {
     gameState = GAME_STATE_SHOW_WINNER;
     clearInterval(gameIntervalObject);
     if(onePlayer) {
-      if(leftWins) {
+      if(leftWon) {
 	nextSlimeIndex++;
 	if(nextSlimeIndex >= slimeAIs.length) {
           menuDiv.innerHTML = '<div style="text-align:center;">' +
             '<h1 style="margin:50px 0 20px 0;">You beat everyone!</h1>' +
-            "Press 'space' to claim your victory..." +
+            "Press 'space' to do it all over again!" +
             '</div>';
 	} else {
           menuDiv.innerHTML = '<div style="text-align:center;">' +
@@ -439,14 +464,20 @@ var GAME_STATE_SHOW_WINNER = 3;
       }
     } else {
       menuDiv.innerHTML = '<div style="text-align:center;">' +
-        '<h1 style="margin:50px 0 20px 0;">Player ' + (leftWins ? '1' : '2') + ' Wins!</h1>' +
+        '<h1 style="margin:50px 0 20px 0;">Player ' + (leftWon ? '1' : '2') + ' Wins!</h1>' +
         "Press 'space' for rematch..." +
         '</div>';
     }
     menuDiv.style.display = 'block';
     canvas.style.display = 'none';
   }
-  function endPoint(leftWins) {
+  function startNextPoint() {
+    initRound(leftWon);
+    updatesToPaint = 0;
+    updateCount = 0;
+    gameState = GAME_STATE_RUNNING;
+  }
+  function endPoint() {
     if(slimeAI) {
       keysDown[KEY_UP] = false;
       keysDown[KEY_RIGHT] = false;
@@ -463,21 +494,21 @@ var GAME_STATE_SHOW_WINNER = 3;
     }
 
     if(onePlayer) {
-      if(leftWins) {
+      if(leftWon) {
         endOfPointText = 'Nice, you got the point!';
       } else {
         endOfPointText = slimeAI.name + ' scores!';
       }
     } else {
-      endOfPointText = 'Player ' + (leftWins ? '1':'2') + ' scores!';
+      endOfPointText = 'Player ' + (leftWon ? '1':'2') + ' scores!';
     }
-    gameState = GAME_STATE_PAUSED;
+    gameState = GAME_STATE_POINT_PAUSE;
     requestAnimationFrame(renderEndOfPoint);
     
-    setTimeout(function initNextPoint() {
-      initRound(leftWins);
-      updatesToPaint = 0;
-      gameState = GAME_STATE_RUNNING;
+    setTimeout(function () {
+      if(gameState == GAME_STATE_POINT_PAUSE) {
+        startNextPoint();
+      }
     }, 700);
   }
   function initRound(server) {
@@ -510,19 +541,12 @@ var GAME_STATE_SHOW_WINNER = 3;
 
   function setupView(view) {
     view.style.position = 'absolute';
-    view.style.left     = '10px';
-    view.style.top      = '10px';
+    view.style.left     = '0';
+    view.style.top      = '0';
   }
 
   function bodyload() {
-    // Create Menu Objects
-    menuDiv = document.createElement('div');
-    setupView(menuDiv,false);
-    menuDiv.style.width  = '750px';
-    menuDiv.style.height = '375px';
-    
-    menuDiv.style.background = "#ca6 url('sky2.jpg') no-repeat";
-    document.body.appendChild(menuDiv);
+    var contentDiv = document.getElementById('GameContentDiv');
 
     // Create Render objects
     canvas = document.createElement('canvas');
@@ -539,14 +563,28 @@ var GAME_STATE_SHOW_WINNER = 3;
 
     // Setup Render Data
     updateWindowSize(canvas.width,canvas.height);
-    document.body.appendChild(canvas);
+    contentDiv.appendChild(canvas);
+
+    // Create Menu Objects
+    menuDiv = document.createElement('div');
+    setupView(menuDiv,false);
+    menuDiv.style.width  = '750px';
+    menuDiv.style.height = '375px';
+    
+    menuDiv.style.background = "#ca6 url('sky2.jpg') no-repeat";
+    contentDiv.appendChild(menuDiv);
+
+    // Create options menu div
+    smallMenuDiv = document.createElement('div');
+    smallMenuDiv.style.position = 'absolute';
+    
 
     // Initialize Logging
     logString = '';
 
     // Initialize Game Data
     nextSlimeIndex = 0;
-    ball       = newLegacyBall(  25,'#fff');
+    ball       = newLegacyBall(  25,'#ff0');
     slimeLeft  = newLegacySlime(true,100,'#f00');
     slimeRight = newLegacySlime(false,100,'#0f0');
     
@@ -556,13 +594,6 @@ var GAME_STATE_SHOW_WINNER = 3;
       skyImage = this;
     }
 
-    /*
-    var localBeachImage = new Image();
-    localBeachImage.src = 'beachbg.jpg';
-    localBeachImage.onload = function() {
-      beachImage = this;
-    }
-    */
     var localBallImage = new Image();
     localBallImage.src = 'vball.png';
     localBallImage.onload = function() {
@@ -609,6 +640,8 @@ var GAME_STATE_SHOW_WINNER = 3;
     initRound(true);
 
     updatesToPaint = 0;
+    updateCount = 0;
+    loadOptions();
     gameState = GAME_STATE_RUNNING
     renderBackground(); // clear the field
     canvas.style.display = 'block';
@@ -618,14 +651,61 @@ var GAME_STATE_SHOW_WINNER = 3;
   function toInitialMenu() {
     menuDiv.innerHTML = '<div style="text-align:center;">' +
       '<h1 style="margin-top:30px;">Slime Volleyball</h1>' +
-      '<span onclick="start(true)" class="btn" style="display:inline-block;margin:20px 30px 20px 30px;">One Player</span>' +
-      '<span onclick="start(false)" class="btn" style="display:inline-block;margin:20px 30px 20px 30px;">Two Player</span>' +
+      '<span onclick="start(true)" class="btn" style="display:inline-block;margin:20px 30px 20px 30px;font-size:40px;">One Player</span>' +
+      '<span onclick="start(false)" class="btn" style="display:inline-block;margin:20px 30px 20px 30px;font-size:40px;">Two Player</span>' +
       '<p>Originally written by Quin Pendragon and Daniel Wedge (http://oneslime.net)<br/>' +
       'Rewritten by Jonathan Marler</p>'
       '</div>';
   }
-
-
+  function loadOptions() {
+    legacyGraphics = document.getElementById('LegacyGraphics').checked;
+    slowMotion = document.getElementById('SlowMotion').checked;
+    if(document.getElementById('PhysicsLog').checked) {
+      physicsLog = 120;
+    } else {
+      physicsLog = 0;
+    }
+  }
+  function showOptions() {
+    if(gameState == GAME_STATE_RUNNING) {
+      gameState = GAME_STATE_MENU_PAUSE;
+    } else if(gameState == GAME_STATE_POINT_PAUSE) {
+      gameState = GAME_STATE_MENU_PAUSE_BETWEEN_POINTS;
+    }
+    var div = document.getElementById('OptionsDiv');
+    div.style.display = 'block';
+  }
+  function hideOptions() {
+    var div = document.getElementById('OptionsDiv');
+    div.style.display = 'none';
+    if(gameState == GAME_STATE_MENU_PAUSE) {
+      updateCount = 0;
+      gameState = GAME_STATE_RUNNING;
+    } else if(gameState == GAME_STATE_MENU_PAUSE_BETWEEN_POINTS) {
+      startNextPoint();
+    }
+    loadOptions();
+  }
 </script>
-</head><body onload="bodyload()">
+</head><body onload="bodyload()" style="text-align:center;">
+
+<div id="ContentDiv" style="position:relative;margin:15px auto;width:750px;">
+  <div id="GameContentDiv"></div>
+  <div id="OptionsDiv" style="position:relative;width:400px;height:360px;margin:0 auto;background:#eee;display:none;border:3px solid #ca6;">
+    <h2>Options</h2><hr/><br/>
+    <span class="SmallButton" onclick="hideOptions()" style="position:absolute;top:5px;right:5px;font-weight:bold;">close</span>
+    <div style="text-align:left;margin:10px;">
+      <input id="LegacyGraphics" type="checkbox">Legacy Graphics</input>
+      <br/><br/>
+      <h3>Debug Options</h3><br/>
+        <input id="PhysicsLog" type="checkbox">Enable Physics Log</input>
+      <br/><br/>
+      <h3>Cheats</h3><br/>
+        <input id="SlowMotion" type="checkbox">Slow Motion</input>
+    </div>
+  </div>
+  <span class="SmallButton" style="position:absolute;top:350px;left:10px;" onclick="showOptions()">
+    Options
+  </span>
+</div>
 </body></html>
