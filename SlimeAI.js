@@ -352,8 +352,14 @@ function setAngryRedSlime(ai) {
 var slimeAIs = [
     {name:"Pathetic White Slime",
      color:'#fff',
+     backImageName:'sky',
+     legacySkyColor:'#00f',
+     backTextColor:'#000',
      initAI:setPatheticWhiteSlime},
     {name:"Angry Red Slime",
      color:'#f70',
+     backImageName:'cave',
+     legacySkyColor:'#f00',
+     backTextColor:'#fff',
      initAI:setAngryRedSlime},
 ];

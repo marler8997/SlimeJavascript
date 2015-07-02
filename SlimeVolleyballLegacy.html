@@ -47,6 +47,7 @@ h1 {font-size:70;}
 
 var physicsLog = 0;
 var TWO_PI = Math.PI*2;
+var WIN_AMOUNT = 7;
 
 // Objects rendered in the slime engine
 // need an x and a y parameter
@@ -67,7 +68,7 @@ function newLegacyBall(radius,color) {
       var radiusPix = this.radius * pixelsPerUnitY + 2;
 
       if(ballImage && !legacyGraphics) {
-	this.rotation += this.velocityX / 50;
+	this.rotation += this.velocityX / 100;
 	this.rotation = this.rotation % TWO_PI;
 
 	ctx.translate(xPix, yPix);
@@ -155,7 +156,10 @@ var GAME_STATE_SHOW_WINNER = 5;
   var pixelsPerUnitX;
   var pixelsPerUnitY;
   var updatesToPaint;
-  var skyImage;
+  var legacySkyColor;
+  var backImage;
+  var backTextColor;
+  var backImages = {};
   var ballImage;
   var gameIntervalObject;
   var endOfPointText;
@@ -343,29 +347,46 @@ var GAME_STATE_SHOW_WINNER = 5;
     
   }
 
+  function renderPoints(score, initialX, xDiff) {
+    ctx.fillStyle = '#ff0';
+    var x = initialX;
+    for(var i = 0; i < score; i++) {
+      ctx.beginPath();
+      ctx.arc(x, 25, 12, 0, TWO_PI);
+      ctx.fill();
+      x += xDiff;
+    }
+    ctx.strokeStyle = backTextColor;
+    ctx.lineWidth = 2;
+    x = initialX;
+    for(var i = 0; i < WIN_AMOUNT; i++) {
+      ctx.beginPath();
+      ctx.arc(x, 25, 12, 0, TWO_PI);
+      ctx.stroke();
+      x += xDiff;
+    }
+  }
 
   // Rendering Functions
   function renderBackground()
   {
     if(legacyGraphics) {
-      ctx.fillStyle='#00f'
+      ctx.fillStyle=legacySkyColor;
       ctx.fillRect(0, 0, viewWidth, courtYPix);
       ctx.fillStyle='#aaa'
       ctx.fillRect(0, courtYPix, viewWidth, viewHeight - courtYPix);
       ctx.fillStyle='#fff'
       ctx.fillRect(viewWidth/2-2,7*viewHeight/10,4,viewHeight/10+5);
     } else {
-      if(skyImage) {
-        ctx.drawImage(skyImage, 0, 0);
-      } else {
-        ctx.fillStyle='#0077ff'
-        ctx.fillRect(0, 0, viewWidth, courtYPix);
-      }
+      ctx.drawImage(backImage, 0, 0);
       ctx.fillStyle='#ca6'
       ctx.fillRect(0, courtYPix, viewWidth, viewHeight - courtYPix);
       ctx.fillStyle='#fff'
       ctx.fillRect(viewWidth/2-2,7*viewHeight/10,4,viewHeight/10+5);
     }
+    // render scores
+    renderPoints(slimeLeftScore, 30, 40);
+    renderPoints(slimeRightScore, viewWidth - 30, -40);
   }
 
   
@@ -379,9 +400,9 @@ var GAME_STATE_SHOW_WINNER = 5;
       }
       renderBackground();
       ctx.fillStyle = '#000';
-      ctx.font = "20px Georgia";
-      ctx.fillText("Score: " + slimeLeftScore, 140, 20);
-      ctx.fillText("Score: " + slimeRightScore, viewWidth - 230, 20);
+      //ctx.font = "20px Georgia";
+      //ctx.fillText("Score: " + slimeLeftScore, 140, 20);
+      //ctx.fillText("Score: " + slimeRightScore, viewWidth - 230, 20);
       ball.render();
       slimeLeft.render();
       slimeRight.render();
@@ -484,11 +505,11 @@ var GAME_STATE_SHOW_WINNER = 5;
       keysDown[KEY_LEFT] = false;
     }
 
-    if(slimeLeftScore >= 5) {
+    if(slimeLeftScore >= WIN_AMOUNT) {
       endMatch(true);
       return;
     }
-    if(slimeRightScore >= 5) {
+    if(slimeRightScore >= WIN_AMOUNT) {
       endMatch(false);
       return;
     }
@@ -585,13 +606,18 @@ var GAME_STATE_SHOW_WINNER = 5;
     // Initialize Game Data
     nextSlimeIndex = 0;
     ball       = newLegacyBall(  25,'#ff0');
-    slimeLeft  = newLegacySlime(true,100,'#f00');
-    slimeRight = newLegacySlime(false,100,'#0f0');
+    slimeLeft  = newLegacySlime(true,100,'#0f0');
+    slimeRight = newLegacySlime(false,100,'#f00');
     
     var localSkyImage = new Image();
     localSkyImage.src = 'sky2.jpg';
     localSkyImage.onload = function() {
-      skyImage = this;
+      backImages['sky'] = this;
+    }
+    var localCaveImage = new Image();
+    localCaveImage.src = 'cave.jpg';
+    localCaveImage.onload = function() {
+      backImages['cave'] = this;
     }
 
     var localBallImage = new Image();
@@ -629,12 +655,19 @@ var GAME_STATE_SHOW_WINNER = 5;
     if(onePlayer) {
       var slimeAIProps = slimeAIs[nextSlimeIndex];
       slimeRight.color = slimeAIProps.color;
-      slimeRight.img = null;
-      slimeAI = newSlimeAI(false,slimeAIProps.name);
+      legacySkyColor   = slimeAIProps.legacySkyColor;
+      backImage        = backImages[slimeAIProps.backImageName];
+      backTextColor    = slimeAIProps.backTextColor;
+
+      slimeRight.img   = null;
+      slimeAI          = newSlimeAI(false,slimeAIProps.name);
       slimeAIProps.initAI(slimeAI);
     } else {
-      slimeRight.img = redSlimeImage;
-      slimeAI = null;
+      legacySkyColor   = '#00f';
+      backImage        = backImages['sky'];
+      backTextColor    = '#000';
+      slimeRight.img   = redSlimeImage;
+      slimeAI          = null;
     }
 
     initRound(true);
