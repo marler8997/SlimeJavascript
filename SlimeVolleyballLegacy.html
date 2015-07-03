@@ -193,7 +193,21 @@ var GAME_STATE_SHOW_WINNER = 5;
   }
 
   // Game Update Functions
-  function updateSlimeVelocities(s,left,right,up) {
+  function updateSlimeVelocities(s,movement,jump) {
+    if(movement == 0) {
+      s.velocityX = 0;
+    } else if(movement == 1) {
+      s.velocityX = -8;
+    } else if(movement == 2) {
+      s.velocityX = 8;
+    } else {
+      throw "slime movement " + movement + " is invalid";
+    }
+    if(jump && s.y == 0) {
+      s.velocityY = 31;
+    }
+  }
+  function updateSlimeVelocitiesWithKeys(s,left,right,up) {
     // update velocities
     if(keysDown[left]) {
       if(keysDown[right]) {
@@ -207,6 +221,23 @@ var GAME_STATE_SHOW_WINNER = 5;
       s.velocityX = 0;
     }
     if(s.y == 0 && keysDown[up]) {
+      s.velocityY = 31;
+    }
+  }
+  function updateSlimeVelocitiesWithDoubleKeys(s,left1,left2,right1,right2,up1,up2) {
+    // update velocities
+    if(keysDown[left1] || keysDown[left2]) {
+      if(keysDown[right1] || keysDown[right2]) {
+        s.velocityX = 0;
+      } else {
+        s.velocityX = -8;
+      }
+    } else if(keysDown[right1] || keysDown[right2]) {
+      s.velocityX = 8;
+    } else {
+      s.velocityX = 0;
+    }
+    if(s.y == 0 && (keysDown[up1] || keysDown[up2])) {
       s.velocityY = 31;
     }
   }
@@ -330,12 +361,17 @@ var GAME_STATE_SHOW_WINNER = 5;
     return false;
   }
   function updateFrame() {
-    if(slimeAI) {
+    if(onePlayer) {
       slimeAI.move(false); // Move the right slime
+      updateSlimeVelocitiesWithDoubleKeys(slimeLeft,
+        KEY_A,KEY_LEFT,
+        KEY_D,KEY_RIGHT,
+        KEY_W,KEY_UP);
+      updateSlimeVelocities(slimeRight,slimeAI.movement,slimeAI.jumpSet);
+    } else {
+      updateSlimeVelocitiesWithKeys(slimeLeft, KEY_A,KEY_D,KEY_W);
+      updateSlimeVelocitiesWithKeys(slimeRight, KEY_LEFT,KEY_RIGHT,KEY_UP);
     }
-
-    updateSlimeVelocities(slimeLeft, KEY_A,KEY_D,KEY_W);
-    updateSlimeVelocities(slimeRight, KEY_LEFT,KEY_RIGHT,KEY_UP);
 
     updateSlime(slimeLeft, 50 , 445);
     updateSlime(slimeRight, 555, 950);

@@ -16,6 +16,11 @@ function newSlimeAI(onLeft,name) {
 
     onLeft            : onLeft,
 
+    // ouptut after move
+    movement          : 0, // 0=none, 1=toNet, 2=toWall
+    jumpSet           : 0, // slime wants to jump
+
+    // input to moveLogic
     meToEnemyWall     : 0, // distance from me to the enemy's wall
     enemyToTheirWall  : 0, // enemy distance to their wall
 
@@ -23,6 +28,7 @@ function newSlimeAI(onLeft,name) {
     ballVXToEnemyWall : 0, // ball velocity to the enemy's wall in x direction
 
     move : function () {
+      this.jumpSet = false; // reset the jump
       if(this.onLeft) {
         this.meToEnemyWall     = gameWidth - slimeLeft.x;
         this.enemyToTheirWall  = gameWidth - slimeRight.x;
@@ -42,33 +48,20 @@ function newSlimeAI(onLeft,name) {
 
     moveLogic : null, // Move logic
 
-    moveToWall : function() {
-      //console.log('moveToWall');
-      if(onLeft) {
-        keysDown[KEY_LEFT ] = true;
-        keysDown[KEY_RIGHT] = false;
-      } else {
-        keysDown[KEY_RIGHT] = true;
-        keysDown[KEY_LEFT ] = false;
-      }
+    stopMovement : function() {
+      this.movement = 0;
     },
     moveToNet : function() {
       //console.log('moveToNet');
-      if(onLeft) {
-        keysDown[KEY_RIGHT] = true;
-        keysDown[KEY_LEFT ] = false;
-      } else {
-        keysDown[KEY_LEFT ] = true;
-        keysDown[KEY_RIGHT] = false;
-      }
+      this.movement = 1;
     },
-    stopMovement : function() {
-      keysDown[KEY_LEFT ] = false;
-      keysDown[KEY_RIGHT] = false;
+    moveToWall : function() {
+      //console.log('moveToWall');
+      this.movement = 2;
     },
     jump : function() {
       //console.log('jump');
-      keysDown[KEY_UP] = true;
+      this.jumpSet = true;
     },
     calculateXWhenBallBelow : function(yLimit) {
       var frameCount = countFramesTillBelow(ball.y, ball.velocityY, yLimit);
@@ -98,7 +91,6 @@ function setPatheticWhiteSlime(ai) {
   };
 
   ai.moveLogic = function(me,enemy) {
-    keysDown[KEY_UP] = false;
 
     if(this.ballToEnemyWall < 500)
       this.state = -1;
@@ -220,7 +212,6 @@ function setAngryRedSlime(ai) {
   };
 
   ai.moveLogic = function(me,enemy) {
-    keysDown[KEY_UP] = false;
 
     if(this.ballToEnemyWall < 500)
       this.state = -1;
@@ -473,7 +464,6 @@ function setMasterSlime(ai) {
     }
   }
   ai.moveLogic = function(me,enemy) {
-    keysDown[KEY_UP] = false;
 
     if(this.state != -1 || (this.ballToEnemyWall == 800 && this.ballVXToEnemyWall == 0)) {
       this.performServe(me);
