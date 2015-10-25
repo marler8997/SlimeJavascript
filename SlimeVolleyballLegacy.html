@@ -3,6 +3,7 @@
 /* MENU CSS */
 * {margin:0;padding:0;font-family: Arial;}
 h1 {font-size:70;}
+h2 {margin: 8px 0;}
 .SmallButton {
   text-decoration: none;
   cursor:pointer;
@@ -39,6 +40,9 @@ h1 {font-size:70;}
   background-image: -ms-linear-gradient(top, #3cb0fd, #3498db);
   background-image: -o-linear-gradient(top, #3cb0fd, #3498db);
   background-image: linear-gradient(to bottom, #3cb0fd, #3498db);
+}
+input[type='checkbox'] {
+  margin-right: 1em;
 }
 </style>
 <script type="text/javascript" src="Input.js"></script>
@@ -146,7 +150,7 @@ var GAME_STATE_SHOW_WINNER = 5;
   var nextSlimeIndex;
 
   var gameState;
-  
+
   // RENDER DATA
   var ctx;
   var canvas;
@@ -185,7 +189,7 @@ var GAME_STATE_SHOW_WINNER = 5;
   // NOTE: this data should be reloaded every time the
   //       gameState goes back to GAME_STATE_RUNNING
   var slowMotion;
-  
+
   var logString;
   function log(msg)
   {
@@ -293,7 +297,7 @@ var GAME_STATE_SHOW_WINNER = 5;
         log(" newBallX  " + ball.x);
         log(" newBallY  " + ball.y);
         log(" something " + something);
-      }      
+      }
 
       if(something <= 0) {
         ball.velocityX += Math.trunc(s.velocityX - 2 * dx * something / dist);
@@ -307,7 +311,7 @@ var GAME_STATE_SHOW_WINNER = 5;
           log(" ballVY    " + ball.velocityY);
         }
       }
-    }    
+    }
   }
   var FUDGE = 5; // not sure why this is needed
   // returns true if end of point
@@ -319,7 +323,7 @@ var GAME_STATE_SHOW_WINNER = 5;
 
     ball.x += ball.velocityX;
     ball.y += ball.velocityY;
-    
+
     collisionBallSlime(slimeLeft);
     collisionBallSlime(slimeRight);
 
@@ -383,7 +387,7 @@ var GAME_STATE_SHOW_WINNER = 5;
     if(updateBall()) {
       return;
     }
-    
+
   }
 
   function renderPoints(score, initialX, xDiff) {
@@ -425,7 +429,7 @@ var GAME_STATE_SHOW_WINNER = 5;
     renderPoints(slimeRightScore, viewWidth - 30, -40);
   }
 
-  
+
   // GAME CODE
   function renderGame() {
     if(updatesToPaint == 0) {
@@ -489,7 +493,7 @@ var GAME_STATE_SHOW_WINNER = 5;
     if(gameState == GAME_STATE_SHOW_WINNER) {
       if(onePlayer && nextSlimeIndex >= slimeAIs.length) {
         nextSlimeIndex = 0;
-        toInitialMenu();        
+        toInitialMenu();
       } else {
         start(onePlayer);
       }
@@ -561,7 +565,7 @@ var GAME_STATE_SHOW_WINNER = 5;
     }
     gameState = GAME_STATE_POINT_PAUSE;
     requestAnimationFrame(renderEndOfPoint);
-    
+
     setTimeout(function () {
       if(gameState == GAME_STATE_POINT_PAUSE) {
         startNextPoint();
@@ -611,7 +615,7 @@ var GAME_STATE_SHOW_WINNER = 5;
     canvas.height = 375;
     setupView(canvas,true);
     canvas.style.display  = 'none';
-    
+
     ctx = canvas.getContext("2d");
     ctx.font = "20px Georgia";
 
@@ -627,14 +631,14 @@ var GAME_STATE_SHOW_WINNER = 5;
     setupView(menuDiv,false);
     menuDiv.style.width  = '750px';
     menuDiv.style.height = '375px';
-    
+
     menuDiv.style.background = "#ca6 url('sky2.jpg') no-repeat";
     contentDiv.appendChild(menuDiv);
 
     // Create options menu div
     smallMenuDiv = document.createElement('div');
     smallMenuDiv.style.position = 'absolute';
-    
+
 
     // Initialize Logging
     logString = '';
@@ -644,7 +648,7 @@ var GAME_STATE_SHOW_WINNER = 5;
     ball       = newLegacyBall(  25,'#ff0');
     slimeLeft  = newLegacySlime(true,100,'#0f0');
     slimeRight = newLegacySlime(false,100,'#f00');
-    
+
     var localSkyImage = new Image();
     localSkyImage.src = 'sky2.jpg';
     localSkyImage.onload = function() {
