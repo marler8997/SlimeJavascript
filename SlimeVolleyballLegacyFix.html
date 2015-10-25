@@ -1,0 +1,801 @@
+<html><head>
+<style type="text/css">
+/* MENU CSS */
+* {margin:0;padding:0;font-family: Arial;}
+h1 {font-size:70;}
+h2 {margin: 8px 0;}
+.SmallButton {
+  text-decoration: none;
+  cursor:pointer;
+  color:#555;
+}
+.SmallButton:hover {
+  color:#000;
+}
+.btn {
+  background: #3498db;
+  background-image: -webkit-linear-gradient(top, #3498db, #2980b9);
+  background-image: -moz-linear-gradient(top, #3498db, #2980b9);
+  background-image: -ms-linear-gradient(top, #3498db, #2980b9);
+  background-image: -o-linear-gradient(top, #3498db, #2980b9);
+  background-image: linear-gradient(to bottom, #3498db, #2980b9);
+  -webkit-border-radius: 15;
+  -moz-border-radius: 15;
+  border-radius: 15px;
+  color: #ffffff;
+  padding: 10px 20px 10px 20px;
+  border: solid #1f628d 5px;
+  text-decoration: none;
+  cursor:pointer;
+  user-select: none;
+  -o-user-select:none;
+  -moz-user-select: none;
+  -khtml-user-select: none;
+  -webkit-user-select: none;
+}
+.btn:hover {
+  background: #3cb0fd;
+  background-image: -webkit-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: -moz-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: -ms-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: -o-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: linear-gradient(to bottom, #3cb0fd, #3498db);
+}
+input[type='checkbox'] {
+  margin-right: 1em;
+}
+</style>
+<script type="text/javascript" src="Input.js"></script>
+<script type="text/javascript" src="SlimeAIFix.js"></script>
+<script type="text/javascript">
+
+var physicsLog = 0;
+var TWO_PI = Math.PI*2;
+var WIN_AMOUNT = 7;
+
+// Objects rendered in the slime engine
+// need an x and a y parameter
+function newLegacyBall(radius,color) {
+  return {
+    radius:radius,
+    color:color,
+    x:0,
+    y:0,
+    velocityX:0,
+    velocityY:0,
+    rotation:0,
+    render: function() {
+      var xPix   = this.x * pixelsPerUnitX;
+      var yPix   = courtYPix - (this.y * pixelsPerUnitY);
+      // The original game's ball looked bigger then
+      // it was, so we add 2 pixels here to the radius
+      var radiusPix = this.radius * pixelsPerUnitY + 2;
+
+      if(ballImage && !legacyGraphics) {
+	this.rotation += this.velocityX / 100;
+	this.rotation = this.rotation % TWO_PI;
+
+	ctx.translate(xPix, yPix);
+        ctx.rotate(this.rotation);
+        ctx.drawImage(ballImage, -radiusPix, -radiusPix);
+	ctx.setTransform(1,0,0,1,0,0);
+      } else {
+        ctx.fillStyle = legacyBallColor;
+        ctx.beginPath();
+        ctx.arc(xPix, yPix, radiusPix, 0, TWO_PI);
+        ctx.fill();
+      }
+    }
+  };
+}
+function newLegacySlime(onLeft,radius,color) {
+  return {
+    onLeft:onLeft,
+    radius:radius,
+    color:color,
+    img:null,
+    x:0,
+    y:0,
+    velocityX:0,
+    velocityY:0,
+    render: function() {
+      var xPix      = this.x * pixelsPerUnitX;
+      var yPix      = courtYPix - (this.y * pixelsPerUnitY);
+      var radiusPix = this.radius * pixelsPerUnitY;
+
+      if(this.img && !legacyGraphics) {
+        ctx.drawImage(this.img, xPix - radiusPix, yPix - 38);
+      } else {
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(xPix, yPix, radiusPix, Math.PI, TWO_PI);
+        ctx.fill();
+      }
+
+      // Draw Eyes
+      var eyeX = this.x + (this.onLeft ? 1 : -1)*this.radius/4;
+      var eyeY = this.y + this.radius/2;
+      var eyeXPix = eyeX * pixelsPerUnitX;
+      var eyeYPix = courtYPix - (eyeY * pixelsPerUnitY);
+      ctx.translate(eyeXPix, eyeYPix);
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(0,0, radiusPix/4, 0, TWO_PI);
+      ctx.fill();
+
+      // Draw Pupil
+      var dx = ball.x - eyeX;
+      var dy = eyeY - ball.y;
+      var dist = Math.sqrt(dx*dx+dy*dy);
+      var rPixOver8 = radiusPix/8;
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.arc(rPixOver8*dx/dist, rPixOver8*dy/dist, rPixOver8, 0, TWO_PI);
+      ctx.fill();
+      ctx.setTransform(1,0,0,1,0,0);
+    }
+  };
+}
+
+var GAME_STATE_RUNNING     = 1;
+var GAME_STATE_POINT_PAUSE = 2;
+var GAME_STATE_MENU_PAUSE  = 3;
+var GAME_STATE_MENU_PAUSE_BETWEEN_POINTS  = 4;
+var GAME_STATE_SHOW_WINNER = 5;
+
+  // MENU DATA
+  var menuDiv;
+  var smallMenuDiv;
+  var onePlayer;
+  var nextSlimeIndex;
+
+  var gameState;
+
+  // RENDER DATA
+  var ctx;
+  var canvas;
+  var viewWidth;
+  var viewHeight;
+  var courtYPix;
+  var pixelsPerUnitX;
+  var pixelsPerUnitY;
+  var updatesToPaint;
+  var legacySkyColor;
+  var legacyGroundColor;
+  var legacyBallColor;
+  var newGroundColor;
+  var backImage;
+  var backTextColor;
+  var backImages = {};
+  var ballImage;
+  var gameIntervalObject;
+  var endOfPointText;
+  var greenSlimeImage;
+  var redSlimeImage;
+  var legacyGraphics;
+
+
+  // GAME DATA
+  var gameWidth,gameHeight;
+  var ball;
+  var slimeLeft;
+  var slimeRight;
+  var slimeLeftScore;
+  var slimeRightScore;
+  var slimeAI;
+  var updateCount; // RESET every time GAME_STATE_RUNNING is set
+  var leftWon;
+  // GAME CHEAT DATA
+  // NOTE: this data should be reloaded every time the
+  //       gameState goes back to GAME_STATE_RUNNING
+  var slowMotion;
+
+  var logString;
+  function log(msg)
+  {
+    logString += msg + '\n';
+  }
+
+  // Game Update Functions
+  function updateSlimeVelocities(s,movement,jump) {
+    if(movement == 0) {
+      s.velocityX = 0;
+    } else if(movement == 1) {
+      s.velocityX = -16;
+    } else if(movement == 2) {
+      s.velocityX = 16;
+    } else {
+      throw "slime movement " + movement + " is invalid";
+    }
+    if(jump && s.y == 0) {
+      s.velocityY = 31;
+    }
+  }
+  function updateSlimeVelocitiesWithKeys(s,left,right,up) {
+    // update velocities
+    if(keysDown[left]) {
+      if(keysDown[right]) {
+        s.velocityX = 0;
+      } else {
+        s.velocityX = -16;
+      }
+    } else if(keysDown[right]) {
+      s.velocityX = 16;
+    } else {
+      s.velocityX = 0;
+    }
+    if(s.y == 0 && keysDown[up]) {
+      s.velocityY = 31;
+    }
+  }
+  function updateSlimeVelocitiesWithDoubleKeys(s,left1,left2,right1,right2,up1,up2) {
+    // update velocities
+    if(keysDown[left1] || keysDown[left2]) {
+      if(keysDown[right1] || keysDown[right2]) {
+        s.velocityX = 0;
+      } else {
+        s.velocityX = -16;
+      }
+    } else if(keysDown[right1] || keysDown[right2]) {
+      s.velocityX = 16;
+    } else {
+      s.velocityX = 0;
+    }
+    if(s.y == 0 && (keysDown[up1] || keysDown[up2])) {
+      s.velocityY = 31;
+    }
+  }
+  function updateSlime(s, leftLimit, rightLimit) {
+    if(s.velocityX != 0) {
+      s.x += s.velocityX;
+      if(s.x < leftLimit) s.x = leftLimit;
+      else if(s.x > rightLimit) s.x = rightLimit;
+    }
+    if(s.velocityY != 0 || s.y > 0) {
+      s.velocityY -= 2;
+      s.y += s.velocityY;
+      if(s.y < 0) {
+        s.y = 0;
+        s.velocityY = 0;
+      }
+    }
+  }
+
+  var MAX_VELOCITY_X = 30;
+  var MAX_VELOCITY_Y = 22;
+  function collisionBallSlime(s) {
+    var dx = ball.x - s.x;
+    var dy = ball.y - s.y;
+    var dist = Math.trunc(Math.sqrt(dx * dx + dy * dy));
+
+    var dVelocityX = ball.velocityX - s.velocityX;
+    var dVelocityY = ball.velocityY - s.velocityY;
+
+    if(dy > 0 && dist < ball.radius + s.radius && dist > FUDGE) {
+      var oldBall = {x:ball.x,y:ball.y,velocityX:ball.velocityX,velocityY:ball.velocityY};
+      if(physicsLog > 0) {
+        log("Collision:");
+        log(" dx        " + dx);
+        log(" dy        " + dy);
+        log(" dist      " + dist);
+        log(" dvx       " + dVelocityX);
+        log(" dvy       " + dVelocityY);
+        log(" oldBallX  " + ball.x);
+        log(" oldBallY  " + ball.y);
+        log(" [DBG] s.x   : " + s.x);
+        log(" [DBG] s.rad : " + s.radius);
+        log(" [DBG] b.rad : " + ball.radius);
+        log(" [DBG] 0   : " + Math.trunc((s.radius + ball.radius) / 2));
+        log(" [DBG] 1   : " + Math.trunc((s.radius + ball.radius) / 2)*dx);
+        log(" [DBG] 2   : " + Math.trunc(Math.trunc((s.radius + ball.radius) / 2)*dx/dist));
+      }
+      ball.x = s.x + Math.trunc((s.radius + ball.radius) * dx / dist);
+      ball.y = s.y + Math.trunc((s.radius + ball.radius) * dy / dist);
+
+      var something = Math.trunc((dx * dVelocityX + dy * dVelocityY) / dist);
+      if(physicsLog > 0) {
+        log(" newBallX  " + ball.x);
+        log(" newBallY  " + ball.y);
+        log(" something " + something);
+      }
+
+      if(something <= 0) {
+        ball.velocityX += Math.trunc(s.velocityX - 2 * dx * something / dist);
+        ball.velocityY += Math.trunc(s.velocityY - 2 * dy * something / dist);
+        if(     ball.velocityX < -MAX_VELOCITY_X) ball.velocityX = -MAX_VELOCITY_X;
+        else if(ball.velocityX >  MAX_VELOCITY_X) ball.velocityX =  MAX_VELOCITY_X;
+        if(     ball.velocityY < -MAX_VELOCITY_Y) ball.velocityY = -MAX_VELOCITY_Y;
+        else if(ball.velocityY >  MAX_VELOCITY_Y) ball.velocityY =  MAX_VELOCITY_Y;
+        if(physicsLog > 0) {
+          log(" ballVX    " + ball.velocityX);
+          log(" ballVY    " + ball.velocityY);
+        }
+      }
+    }
+  }
+  var FUDGE = 5; // not sure why this is needed
+  // returns true if end of point
+  function updateBall() {
+    ball.velocityY += -1; // gravity
+    if(ball.velocityY < -MAX_VELOCITY_Y) {
+      ball.velocityY = -MAX_VELOCITY_Y;
+    }
+
+    ball.x += ball.velocityX;
+    ball.y += ball.velocityY;
+
+    collisionBallSlime(slimeLeft);
+    collisionBallSlime(slimeRight);
+
+    // handle wall hits
+    if (ball.x < 30) {
+      ball.x = 30;
+      ball.velocityX = -ball.velocityX;
+    } else if(ball.x > 1970){
+      ball.x = 1970;
+      ball.velocityX = -ball.velocityX;
+    }
+    // hits the post
+    if (ball.x > 960 && ball.x < 1040 && ball.y < 140) {
+      // bounces off top of net
+      if (ball.velocityY < 0 && ball.y > 260) {
+        ball.velocityY *= -1;
+        ball.y = 130;
+        console.log("net bounce up");
+      } else if (ball.x < 1000) { // hits side of net
+        ball.x = 960;
+        ball.velocityX = ball.velocityX >= 0 ? -ball.velocityX : ball.velocityX;
+        console.log("net bounce left");
+      } else {
+        console.log("net bounce right");
+        ball.x = 1040;
+        ball.velocityX = ball.velocityX <= 0 ? -ball.velocityX : ball.velocityX;
+      }
+    }
+
+    // Check for end of point
+    if(ball.y < 0) {
+      if(ball.x > 1000) {
+        leftWon = true;
+        slimeLeftScore++;
+      } else {
+        leftWon = false;
+        slimeRightScore++;
+      }
+      endPoint()
+      return true;
+    }
+    return false;
+  }
+  function updateFrame() {
+    if(onePlayer) {
+      slimeAI.move(false); // Move the right slime
+      updateSlimeVelocitiesWithDoubleKeys(slimeLeft,
+        KEY_A,KEY_LEFT,
+        KEY_D,KEY_RIGHT,
+        KEY_W,KEY_UP);
+      updateSlimeVelocities(slimeRight,slimeAI.movement,slimeAI.jumpSet);
+    } else {
+      updateSlimeVelocitiesWithKeys(slimeLeft, KEY_A,KEY_D,KEY_W);
+      updateSlimeVelocitiesWithKeys(slimeRight, KEY_LEFT,KEY_RIGHT,KEY_UP);
+    }
+
+    //updateSlime(slimeLeft, 50 , 445);
+    //updateSlime(slimeRight, 555, 950);
+    updateSlime(slimeLeft, 100 , 890);
+    updateSlime(slimeRight, 1110, 1900);
+
+    // Allows slimes to go accross the net
+    //updateSlime(slimeLeft, 0, 1000);
+    //updateSlime(slimeRight, 0, 1000);
+
+    if(updateBall()) {
+      return;
+    }
+
+  }
+
+  function renderPoints(score, initialX, xDiff) {
+    ctx.fillStyle = '#ff0';
+    var x = initialX;
+    for(var i = 0; i < score; i++) {
+      ctx.beginPath();
+      ctx.arc(x, 25, 12, 0, TWO_PI);
+      ctx.fill();
+      x += xDiff;
+    }
+    ctx.strokeStyle = backTextColor;
+    ctx.lineWidth = 2;
+    x = initialX;
+    for(var i = 0; i < WIN_AMOUNT; i++) {
+      ctx.beginPath();
+      ctx.arc(x, 25, 12, 0, TWO_PI);
+      ctx.stroke();
+      x += xDiff;
+    }
+  }
+
+  // Rendering Functions
+  function renderBackground()
+  {
+    if(legacyGraphics) {
+      ctx.fillStyle=legacySkyColor;
+      ctx.fillRect(0, 0, viewWidth, courtYPix);
+      ctx.fillStyle = legacyGroundColor;
+    } else {
+      ctx.drawImage(backImage, 0, 0);
+      ctx.fillStyle = newGroundColor;
+    }
+    ctx.fillRect(0, courtYPix, viewWidth, viewHeight - courtYPix);
+    ctx.fillStyle='#fff'
+    ctx.fillRect(viewWidth/2-2,7*viewHeight/10,4,viewHeight/10+5);
+    // render scores
+    renderPoints(slimeLeftScore, 30, 40);
+    renderPoints(slimeRightScore, viewWidth - 30, -40);
+  }
+
+
+  // GAME CODE
+  function renderGame() {
+    if(updatesToPaint == 0) {
+      console.log("ERROR: render called but not ready to paint");
+    } else {
+      if(updatesToPaint > 1) {
+        console.log("WARNING: render missed " + (updatesToPaint - 1) + " frame(s)");
+      }
+      renderBackground();
+      ctx.fillStyle = '#000';
+      //ctx.font = "20px Georgia";
+      //ctx.fillText("Score: " + slimeLeftScore, 140, 20);
+      //ctx.fillText("Score: " + slimeRightScore, viewWidth - 230, 20);
+      ball.render();
+      slimeLeft.render();
+      slimeRight.render();
+      updatesToPaint = 0;
+    }
+  }
+  function renderEndOfPoint() {
+    var textWidth = ctx.measureText(endOfPointText).width;
+    renderGame();
+    ctx.fillStyle = '#000';
+    ctx.fillText(endOfPointText,
+      (viewWidth - textWidth)/2, courtYPix + (viewHeight - courtYPix)/2);
+  }
+
+
+
+  function gameIteration() {
+    if(gameState == GAME_STATE_RUNNING) {
+      updateCount++;
+      if(slowMotion && (updateCount % 2) == 0)
+        return;
+      if(updatesToPaint > 0) {
+        console.log("WARNING: updating frame before it was rendered");
+      }
+      if(physicsLog > 0) {
+        log("Frame");
+        log(" ball.x  " + ball.x);
+        log(" ball.y  " + ball.y);
+        log(" ball.vx " + ball.velocityX);
+        log(" ball.vy " + ball.velocityY);
+        physicsLog--;
+        if(physicsLog == 0) {
+          var logDom = document.createElement('pre');
+          logDom.innerHTML = logString;
+          document.body.appendChild(logDom);
+        }
+      }
+      updateFrame();
+      updatesToPaint++;
+      if(updatesToPaint == 1) {
+        requestAnimationFrame(renderGame);
+      }
+    }
+  }
+
+
+  function spaceKeyDown() {
+    if(gameState == GAME_STATE_SHOW_WINNER) {
+      if(onePlayer && nextSlimeIndex >= slimeAIs.length) {
+        nextSlimeIndex = 0;
+        toInitialMenu();
+      } else {
+        start(onePlayer);
+      }
+    }
+  }
+  function endMatch() {
+    gameState = GAME_STATE_SHOW_WINNER;
+    clearInterval(gameIntervalObject);
+    if(onePlayer) {
+      if(leftWon) {
+	nextSlimeIndex++;
+	if(nextSlimeIndex >= slimeAIs.length) {
+          menuDiv.innerHTML = '<div style="text-align:center;">' +
+            '<h1 style="margin:50px 0 20px 0;">You beat everyone!</h1>' +
+            "Press 'space' to do it all over again!" +
+            '</div>';
+	} else {
+          menuDiv.innerHTML = '<div style="text-align:center;">' +
+            '<h1 style="margin:50px 0 20px 0;">You won!</h1>' +
+            "Press 'space' to continue..." +
+            '</div>';
+	}
+      } else {
+	nextSlimeIndex = 0;
+        menuDiv.innerHTML = '<div style="text-align:center;">' +
+          '<h1 style="margin:50px 0 20px 0;">You lost :(</h1>' +
+          "Press 'space' to retry..." +
+          '</div>';
+      }
+    } else {
+      menuDiv.innerHTML = '<div style="text-align:center;">' +
+        '<h1 style="margin:50px 0 20px 0;">Player ' + (leftWon ? '1' : '2') + ' Wins!</h1>' +
+        "Press 'space' for rematch..." +
+        '</div>';
+    }
+    menuDiv.style.display = 'block';
+    canvas.style.display = 'none';
+  }
+  function startNextPoint() {
+    initRound(leftWon);
+    updatesToPaint = 0;
+    updateCount = 0;
+    gameState = GAME_STATE_RUNNING;
+  }
+  function endPoint() {
+    if(slimeAI) {
+      keysDown[KEY_UP] = false;
+      keysDown[KEY_RIGHT] = false;
+      keysDown[KEY_LEFT] = false;
+    }
+
+    if(slimeLeftScore >= WIN_AMOUNT) {
+      endMatch(true);
+      return;
+    }
+    if(slimeRightScore >= WIN_AMOUNT) {
+      endMatch(false);
+      return;
+    }
+
+    if(onePlayer) {
+      if(leftWon) {
+        endOfPointText = 'Nice, you got the point!';
+      } else {
+        endOfPointText = slimeAI.name + ' scores!';
+      }
+    } else {
+      endOfPointText = 'Player ' + (leftWon ? '1':'2') + ' scores!';
+    }
+    gameState = GAME_STATE_POINT_PAUSE;
+    requestAnimationFrame(renderEndOfPoint);
+
+    setTimeout(function () {
+      if(gameState == GAME_STATE_POINT_PAUSE) {
+        startNextPoint();
+      }
+    }, 700);
+  }
+  function initRound(server) {
+    ball.x = server ? 400 : 1600;
+    ball.y = 356;
+    ball.velocityX = 0;
+    ball.velocityY = 0;
+
+    slimeLeft.x = 400;
+    slimeLeft.y = 0;
+    slimeLeft.velocityX = 0;
+    slimeLeft.velocityY = 0;
+
+    slimeRight.x = 1600;
+    slimeRight.y = 0;
+    slimeRight.velocityX = 0;
+    slimeRight.velocityY = 0;
+  }
+
+  function updateWindowSize(width,height) {
+    viewWidth = width;
+    viewHeight = height;
+    console.log("ViewSize x: " + width + ", y: " + height);
+    pixelsPerUnitX = width / gameWidth;
+    pixelsPerUnitY = height / gameHeight;
+    console.log("GAMESIZE x: " + gameWidth + ", y: " + gameHeight);
+    console.log("PPU      x: " + pixelsPerUnitX + ", y: " + pixelsPerUnitY);
+    courtYPix = 4 * viewHeight / 5;
+  }
+
+  function setupView(view) {
+    view.style.position = 'absolute';
+    view.style.left     = '0';
+    view.style.top      = '0';
+  }
+
+  function bodyload() {
+    var contentDiv = document.getElementById('GameContentDiv');
+
+    // Create Render objects
+    canvas = document.createElement('canvas');
+    canvas.width  = 750;
+    canvas.height = 375;
+    setupView(canvas,true);
+    canvas.style.display  = 'none';
+
+    ctx = canvas.getContext("2d");
+    ctx.font = "20px Georgia";
+
+    gameWidth  = 2000;
+    gameHeight = 1000;
+
+    // Setup Render Data
+    updateWindowSize(canvas.width,canvas.height);
+    contentDiv.appendChild(canvas);
+
+    // Create Menu Objects
+    menuDiv = document.createElement('div');
+    setupView(menuDiv,false);
+    menuDiv.style.width  = '750px';
+    menuDiv.style.height = '375px';
+
+    menuDiv.style.background = "#ca6 url('sky2.jpg') no-repeat";
+    contentDiv.appendChild(menuDiv);
+
+    // Create options menu div
+    smallMenuDiv = document.createElement('div');
+    smallMenuDiv.style.position = 'absolute';
+
+
+    // Initialize Logging
+    logString = '';
+
+    // Initialize Game Data
+    nextSlimeIndex = 0;
+    ball       = newLegacyBall(  25,'#ff0');
+    slimeLeft  = newLegacySlime(true,100,'#0f0');
+    slimeRight = newLegacySlime(false,100,'#f00');
+
+    var localSkyImage = new Image();
+    localSkyImage.src = 'sky2.jpg';
+    localSkyImage.onload = function() {
+      backImages['sky'] = this;
+    }
+    var localCaveImage = new Image();
+    localCaveImage.src = 'cave.jpg';
+    localCaveImage.onload = function() {
+      backImages['cave'] = this;
+    }
+    var sunsetImage = new Image();
+    sunsetImage.src = 'sunset.jpg';
+    sunsetImage.onload = function() {
+      backImages['sunset'] = this;
+    }
+
+    var localBallImage = new Image();
+    localBallImage.src = 'vball.png';
+    localBallImage.onload = function() {
+      ballImage = this;
+    }
+
+    greenSlimeImage = new Image();
+    greenSlimeImage.src = 'slime175green.png';
+    /*
+    greenSlimeImage.onload = function() {
+      slimeLeft.img = this;
+    }
+    */
+    redSlimeImage = new Image();
+    redSlimeImage.src = 'slime175red.png';
+    /*
+    redSlimeImage.onload = function() {
+      slimeRight.img = this;
+    }
+    */
+
+    toInitialMenu();
+  }
+
+  // Menu Functions
+  function start(startAsOnePlayer) {
+    onePlayer = startAsOnePlayer;
+
+    slimeLeftScore = 0;
+    slimeRightScore = 0;
+
+    slimeLeft.img = greenSlimeImage;
+    if(onePlayer) {
+      var slimeAIProps = slimeAIs[nextSlimeIndex];
+      slimeRight.color = slimeAIProps.color;
+      legacySkyColor   = slimeAIProps.legacySkyColor;
+      backImage        = backImages[slimeAIProps.backImageName];
+      backTextColor    = slimeAIProps.backTextColor;
+      legacyGroundColor= slimeAIProps.legacyGroundColor;
+      legacyBallColor  = slimeAIProps.legacyBallColor;
+      newGroundColor   = slimeAIProps.newGroundColor;
+
+      slimeRight.img   = null;
+      slimeAI          = newSlimeAI(false,slimeAIProps.name);
+      slimeAIProps.initAI(slimeAI);
+    } else {
+      legacySkyColor   = '#00f';
+      backImage        = backImages['sky'];
+      backTextColor    = '#000';
+      legacyGroundColor= '#888';
+      legacyBallColor  = '#fff';
+      newGroundColor   = '#ca6';
+
+      slimeRight.img   = redSlimeImage;
+      slimeAI          = null;
+    }
+
+    initRound(true);
+
+    updatesToPaint = 0;
+    updateCount = 0;
+    loadOptions();
+    gameState = GAME_STATE_RUNNING
+    renderBackground(); // clear the field
+    canvas.style.display = 'block';
+    menuDiv.style.display = 'none';
+    gameIntervalObject = setInterval(gameIteration, 20);
+  }
+  function toInitialMenu() {
+    menuDiv.innerHTML = '<div style="text-align:center;">' +
+      '<h1 style="margin-top:30px;">Slime Volleyball</h1>' +
+      '<span onclick="start(true)" class="btn" style="display:inline-block;margin:20px 30px 20px 30px;font-size:40px;">One Player</span>' +
+      '<span onclick="start(false)" class="btn" style="display:inline-block;margin:20px 30px 20px 30px;font-size:40px;">Two Player</span>' +
+      '<p>Originally written by Quin Pendragon and Daniel Wedge (http://oneslime.net)<br/>' +
+      'Rewritten by Jonathan Marler</p>'
+      '</div>';
+  }
+  function loadOptions() {
+    legacyGraphics = document.getElementById('LegacyGraphics').checked;
+    slowMotion = document.getElementById('SlowMotion').checked;
+    if(document.getElementById('PhysicsLog').checked) {
+      physicsLog = 120;
+    } else {
+      physicsLog = 0;
+    }
+  }
+  function showOptions() {
+    if(gameState == GAME_STATE_RUNNING) {
+      gameState = GAME_STATE_MENU_PAUSE;
+    } else if(gameState == GAME_STATE_POINT_PAUSE) {
+      gameState = GAME_STATE_MENU_PAUSE_BETWEEN_POINTS;
+    }
+    var div = document.getElementById('OptionsDiv');
+    div.style.display = 'block';
+  }
+  function hideOptions() {
+    var div = document.getElementById('OptionsDiv');
+    div.style.display = 'none';
+    if(gameState == GAME_STATE_MENU_PAUSE) {
+      updateCount = 0;
+      gameState = GAME_STATE_RUNNING;
+    } else if(gameState == GAME_STATE_MENU_PAUSE_BETWEEN_POINTS) {
+      startNextPoint();
+    }
+    loadOptions();
+  }
+</script>
+</head><body onload="bodyload()" style="text-align:center;">
+
+<div id="ContentDiv" style="position:relative;margin:15px auto;width:750px;">
+  <div id="GameContentDiv"></div>
+  <div id="OptionsDiv" style="position:relative;width:400px;height:360px;margin:0 auto;background:#eee;display:none;border:3px solid #ca6;">
+    <h2>Options</h2><hr/><br/>
+    <span class="SmallButton" onclick="hideOptions()" style="position:absolute;top:5px;right:5px;font-weight:bold;">close</span>
+    <div style="text-align:left;margin:10px;">
+      <input id="LegacyGraphics" type="checkbox">Legacy Graphics</input>
+      <br/><br/>
+      <h3>Debug Options</h3><br/>
+        <input id="PhysicsLog" type="checkbox">Enable Physics Log</input>
+      <br/><br/>
+      <h3>Cheats</h3><br/>
+        <input id="SlowMotion" type="checkbox">Slow Motion</input>
+    </div>
+  </div>
+  <span class="SmallButton" style="position:absolute;top:350px;left:10px;" onclick="showOptions()">
+    Options
+  </span>
+</div>
+</body></html>
