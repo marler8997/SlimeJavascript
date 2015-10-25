@@ -1,3 +1,7 @@
+// Make sure Math.trunc is defined (for older browsers)
+Math.trunc = Math.trunc || function(x) {
+  return x < 0 ? Math.ceil(x) : Math.floor(x);
+}
 
 // Assumes gravity is -1 per frame
 function countFramesTillBelow(y, vy, limit) {
