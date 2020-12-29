@@ -815,12 +815,10 @@
     }
     window.onload = function() {
         ! function() {
-            let e = 1,
                 s = "oneslime.net";
-            for (let i = Math.max(0, s.length - 12); i < s.length; ++i) e += (s.charCodeAt(i) << 2) - 411;
             new ot, new _t, new pt, new ct;
             let h = document.getElementById("canvas");
-            i = h.width * e, t = h.height * e, k = G = !1, M = "Click the mouse to play!", Ti(), k = G = !1, M = "Click the mouse to play!", K = ["yellow", "white", "red", "black", "blue", "blue"], Q = ["You are a loser!", (N = ["Inferior Human Controlled Slime ", "The Pathetic White Slime ", "Angry Red Slimons ", "The Slime Master ", "Psycho Slime ", "The Big Blue Boss "])[2] + "gives you the gong!", N[3] + 'says "You are seriously inept."', N[4] + "laughs at the pathetic slow opposition.", N[5] + "devours you!"], z = ["Better luck next time.", "So who has the red face bombing out on level 2, huh?", "Congrats on reaching level 3.", "Congrats on reaching level 4!", "Yum."], n = 0, ti = 8, si = 31 * e, a = 100 * e, ai = 0, ri = !0, W = !1, yi(), Si(), ui = new Array, Mi(), wi(), oi = new Array;
+            i = h.width, t = h.height, k = G = !1, M = "Click the mouse to play!", Ti(), k = G = !1, M = "Click the mouse to play!", K = ["yellow", "white", "red", "black", "blue", "blue"], Q = ["You are a loser!", (N = ["Inferior Human Controlled Slime ", "The Pathetic White Slime ", "Angry Red Slimons ", "The Slime Master ", "Psycho Slime ", "The Big Blue Boss "])[2] + "gives you the gong!", N[3] + 'says "You are seriously inept."', N[4] + "laughs at the pathetic slow opposition.", N[5] + "devours you!"], z = ["Better luck next time.", "So who has the red face bombing out on level 2, huh?", "Congrats on reaching level 3.", "Congrats on reaching level 4!", "Yum."], n = 0, ti = 8, si = 31, a = 100, ai = 0, ri = !0, W = !1, yi(), Si(), ui = new Array, Mi(), wi(), oi = new Array;
             for (let i = 0; i < 1e3; ++i) oi.push([0, 0, 0, 0, 0, 0, 0, 0])
         }()
     }
